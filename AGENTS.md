@@ -83,3 +83,25 @@ Reload context from files when:
 - the thread feels inconsistent with the files
 - a major code, architecture, or repo-structure decision is about to be made
 
+## Output Contract Rules
+
+- Required report sections and required labels must be stable before any LLM integration work begins.
+- Any change to either list is a breaking change. All dependent tests and benchmark assertion files must be updated in the same slice.
+- Structural validation must use exact string matching only. Fuzzy or regex matching is not permitted.
+- Section-aware validation is mandatory: each required label must appear exactly once, in its declared section.
+- Heading validation must be line-anchored: `line.rstrip() == heading`. Headings embedded in prose or indented text must not satisfy the check.
+
+## LLM Integration Rules
+
+- Every prompt must include: the full output contract (headings + labels), a no-invention instruction, an assumption-surfacing instruction, and a do-not-contradict instruction.
+- The repair pass is structural-only: placeholder text for missing headings, `not specified` for missing labels. It must never synthesise content.
+- Provider-specific code belongs only in concrete client implementations. Credentials come from environment variables only.
+- Prompt builder must receive every input schema field. Silent omission is a hard-to-detect regression.
+
+## Test Rules
+
+- Test temporary files must use `tests/.tmp/` or `tmp/` under project root. OS temp directories are forbidden.
+- Committed benchmark folders and input files are regression anchors. Do not delete or structurally modify them without a corresponding test update.
+- When a new flow function is added, wire its CLI entry point in the same slice or log it immediately in `claude-memory/notes.md` under Deferred Items.
+- Deferred items must be logged in the same session the deferral is decided.
+
