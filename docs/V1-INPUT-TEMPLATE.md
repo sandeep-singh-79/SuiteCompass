@@ -176,7 +176,7 @@ See the [USAGE-GUIDE](USAGE-GUIDE.md) for the full Excel import workflow.
 The input loader (`input_loader.py`) enforces these binary checks:
 
 - All three top-level keys (`sprint_context`, `test_suite`, `constraints`) must be present
-- `stories` must be a non-empty list
+- `stories` must be a list (may be empty if no stories are defined for the sprint)
 - Each story must have `id`, `risk`, `changed_areas` (list), `dependency_stories` (list)
 - `risk` must be one of: `high`, `medium`, `low`
 - `name` is required on every test
@@ -185,5 +185,5 @@ The input loader (`input_loader.py`) enforces these binary checks:
 - `execution_time_secs` must be a non-negative number
 - `flakiness_rate` must be between 0.0 and 1.0
 - `dependency_stories` IDs must reference stories defined in the same `sprint_context`
-- `test_suite` must be a non-empty list
+- `test_suite` must be a list (may be empty; an empty suite produces no recommendations)
 - `mandatory_tags` must be a list

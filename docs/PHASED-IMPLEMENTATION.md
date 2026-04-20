@@ -67,9 +67,9 @@ Architecture retrospective and decision log for SuiteCompass. What was built in 
 
 ## Phase 3 — Excel Import Adapter (Spike)
 
-**Branch:** `phase-3-excel-adapter` (extends `phase-1-deterministic-core`)
-**Scope:** A1–A3, A5, A6 (A4 merge utility deferred)
-**Deliverables:** Excel template, Excel loader, CLI `import-tests` subcommand
+**Branch:** `phase-3-excel-adapter` (extends `phase-1-deterministic-core`) + `phase-3-merge-utility`
+**Scope:** A1–A6 (all tracks complete)
+**Deliverables:** Excel template, Excel loader, CLI `import-tests` subcommand, CLI merge utility
 
 ### Why Phase 3 Before Phase 2
 
@@ -87,6 +87,49 @@ Phase 3 was prioritised over Phase 2 (documentation) because:
 | `cli.py` `import-tests` | New subcommand: emit `test_suite:` YAML block from Excel |
 | `benchmarks/sample-import.xlsx` | 7-row benchmark sample for round-trip testing |
 | 62 Excel-related tests | Loader, CLI, round-trip tests |
+
+---
+
+## Phase 3b — Merge Utility (A4)
+
+**Branch:** `phase-3-merge-utility`
+**Scope:** A4 — split-file merge mode for `iro run`
+**Deliverables:** `--tests` + `--sprint` CLI flags, `run_pipeline_from_merged()`, `validate_raw()` extraction, duplicate test_id detection
+
+### What Was Built
+
+| Component | Purpose |
+|---|---|
+| `iro run --tests <t.yaml> --sprint <s.yaml>` | Merge two YAML files before running the pipeline — no manual merge step needed |
+| `run_pipeline_from_merged()` in `end_to_end_flow.py` | Pipeline entry point for pre-merged dict input |
+| `validate_raw()` extracted from `input_loader.py` | Shared validation logic used by both file-based and dict-based paths |
+| Duplicate `test_id` detection in `validate_raw()` | Raises `InputValidationError` on duplicate IDs across all input paths |
+| `tests/test_cli_merge.py` | 18 tests covering happy path, argument validation, file errors, validation errors, round-trip |
+
+### Key Design Decisions
+
+**Split-file, not two-suite merge**
+- The utility combines one test-suite file with one sprint-context file — disjoint concerns with no overlap.
+- There is no append/overwrite scenario. The two files hold structurally different data.
+
+**validate_raw() extracted for reuse**
+- Previously all validation lived inside `load_input()` (file-based only). Extraction enables the merge path to share identical validation.
+
+**Duplicate test_id detection added to all paths**
+- GPT-5.4 review flagged collision risk. Detection added to `validate_raw()` so it applies to every input path — not just merge.
+
+### Review Findings and Fixes
+
+| Finding | Fix |
+|---|---|
+| Duplicate test_id not checked | Added loop + set in `validate_raw()` to raise on duplicates |
+| Review misread merge as two-suite merge | No action — architecture is one-test-suite + one-sprint-context only |
+
+### Metrics
+
+- 248 tests total (18 merge-specific), all green
+- 97.7% coverage
+- All prior benchmarks still pass
 
 ### Key Design Decisions
 
@@ -175,13 +218,23 @@ Two GPT-5.4 reviews identified critical issues that were fixed:
 
 ---
 
-## What's Next (Phase 4+)
+## MVP Status
 
-| Phase | Scope | Trigger |
-|---|---|---|
-| Phase 4 | Jira adapter — auto-populate sprint_context from sprint board | When adoption justifies API integration |
-| Phase 5 | JUnit XML adapter — derive flakiness_rate and failure_count from historical test runs | When teams need automated enrichment |
-| Phase 6 | LLM narrative layer — generate explanatory text alongside deterministic recommendations | When deterministic pipeline is proven in production use |
-| Phase 7 | Multi-hop dependency traversal | When real-world usage demonstrates 1-hop insufficient |
-| Phase 8 | Fuzzy area matching (SCM-derived changed_areas) | When SCM integration available |
-| Phase 9 | Configurable scoring weights | When different teams need different multipliers |
+**MVP is sealed.** All planned phases (1, 3, 2) are complete and merged to `master` at tag `v0.3.0`.
+
+The backlog below represents possible future directions but is not planned work.
+
+---
+
+## Permanently Backlogged (not planned)
+
+| Item | Why Deferred |
+|---|---|
+| Jira adapter | Requires API integration justification from real adoption |
+| JUnit XML adapter | No teams providing historical test run data yet |
+| LLM narrative layer | Deterministic core is the right foundation; LLM adds polish, not correctness |
+| Multi-hop dependency traversal | 1-hop covers 90%+ of real sprint shapes |
+| Fuzzy coverage_areas matching | Requires SCM integration first |
+| Configurable scoring weights | Single well-tuned formula more useful than configurable one for MVP |
+| CI pipeline / GitHub Actions | Not blocking for portfolio showcasing |
+| PyPI publish | Not blocking for current use case |

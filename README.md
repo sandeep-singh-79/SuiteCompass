@@ -49,6 +49,7 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | Command | Purpose | Key Flags | Exit Codes |
 |---|---|---|---|
 | `iro run <input.yaml>` | Run optimisation pipeline, print report | `--output, -o <path>` | 0 = success, 1 = validation error, 2 = input error |
+| `iro run --tests <t.yaml> --sprint <s.yaml>` | Merge separate test suite + sprint context files and run | `--output, -o <path>` | 0 = success, 2 = input error |
 | `iro benchmark <input.yaml> <assertions.yaml>` | Run pipeline + validate against assertions | — | 0 = pass, 1 = fail, 2 = input error |
 | `iro import-tests <file.xlsx>` | Import Excel test inventory as test_suite YAML | `--output, -o <path>`, `--sheet, -s <name>` | 0 = success, 2 = input error |
 
@@ -70,10 +71,10 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | Metric | Value |
 |---|---|
 | Phase 1 (Deterministic Core) | Complete |
-| Phase 3 (Excel Adapter Spike) | Complete |
+| Phase 3 (Excel Adapter — all tracks A1–A6) | Complete |
 | Phase 2 (Documentation) | Complete |
-| Tests | 228+ |
-| Coverage | 98%+ |
+| Tests | 248 |
+| Coverage | 97.7% |
 | Python | ≥ 3.13 |
 
 ## License
