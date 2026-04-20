@@ -1,0 +1,262 @@
+"""Scoring engine for intelligent-regression-optimizer.
+
+Implements the deterministic scoring pipeline:
+  load → classify → score_tests → render
+
+Public API: score_tests(normalized, classifications) → TierResult
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from intelligent_regression_optimizer.models import ScoredTest, TierResult
+
+# ---------------------------------------------------------------------------
+# Scoring constants
+# ---------------------------------------------------------------------------
+
+RISK_MULTIPLIERS: dict[str, float] = {"high": 1.0, "medium": 0.6, "low": 0.3}
+DEP_DISCOUNT = 0.5
+
+TIER_MUST_RUN = 8.0
+TIER_SHOULD_RUN = 4.0
+
+NFR_LAYERS = {"performance", "security"}
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> TierResult:
+    """Score every test and assign it to a tier.
+
+    Args:
+        normalized:      The ``normalized`` dict from :class:`InputPackage`.
+        classifications: The dict returned by :func:`classify_context`.
+
+    Returns:
+        :class:`TierResult` with must_run, should_run, defer, retire lists
+        and a budget_overflow flag.
+    """
+    sprint = normalized["sprint_context"]
+    stories: list[dict] = sprint.get("stories", [])
+    exploratory: list[dict] = sprint.get("exploratory_sessions", [])
+    tests: list[dict] = normalized.get("test_suite", [])
+    constraints: dict = normalized.get("constraints", {})
+
+    budget_mins: float = constraints.get("time_budget_mins", 60)
+    mandatory_tags: set[str] = set(constraints.get("mandatory_tags", []))
+    retire_threshold: float = constraints.get("flakiness_retire_threshold", 0.30)
+    nfr_elevation: bool = classifications.get("nfr_elevation_required", False)
+
+    # --- 1. Unique coverage map (global suite property) ---------------------
+    unique_coverage: set[str] = _build_unique_coverage(tests)
+
+    # --- 2. Score every test ------------------------------------------------
+    scored: list[ScoredTest] = []
+    for test in tests:
+        raw = _compute_raw_score(test, stories, exploratory)
+        is_manual = not test.get("automated", True)
+
+        # Determine hard override
+        override, reason = _check_override(test, mandatory_tags, nfr_elevation)
+
+        scored.append(ScoredTest(
+            test_id=test["id"],
+            name=test["name"],
+            raw_score=raw,
+            tier="",          # filled in below
+            is_override=override,
+            override_reason=reason,
+            is_manual=is_manual,
+        ))
+
+    # --- 3. Identify retire candidates -------------------------------------
+    retire_ids: set[str] = _find_retire_candidates(tests, retire_threshold, unique_coverage)
+
+    # --- 4. Assign initial tiers -------------------------------------------
+    must_run: list[ScoredTest] = []
+    should_run: list[ScoredTest] = []
+    defer: list[ScoredTest] = []
+    retire: list[ScoredTest] = []
+
+    for st in scored:
+        test = next(t for t in tests if t["id"] == st.test_id)
+
+        if st.test_id in retire_ids:
+            st.tier = "retire"
+            retire.append(st)
+            continue
+
+        if st.is_override:
+            st.tier = "must-run"
+            must_run.append(st)
+            continue
+
+        if st.raw_score >= TIER_MUST_RUN:
+            st.tier = "must-run"
+            must_run.append(st)
+        elif st.raw_score >= TIER_SHOULD_RUN:
+            st.tier = "should-run"
+            should_run.append(st)
+        else:
+            st.tier = "defer"
+            defer.append(st)
+
+    # --- 5. Budget constraint (scored must-run only; overrides exempt) ------
+    overflow_demoted: list[ScoredTest] = []
+    budget_overflow = False
+
+    scored_must_run = [s for s in must_run if not s.is_override]
+    override_must_run = [s for s in must_run if s.is_override]
+
+    scored_must_run, demoted, budget_overflow = _apply_budget_constraint(
+        scored_must_run, tests, budget_mins
+    )
+
+    for st in demoted:
+        st.tier = "should-run"
+    should_run = demoted + should_run
+
+    must_run = override_must_run + scored_must_run
+
+    return TierResult(
+        must_run=must_run,
+        should_run=should_run,
+        defer=defer,
+        retire=retire,
+        budget_overflow=budget_overflow,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _compute_raw_score(
+    test: dict,
+    stories: list[dict],
+    exploratory_sessions: list[dict],
+) -> float:
+    """Compute the raw score for a single test."""
+    coverage_areas: set[str] = set(test.get("coverage_areas", []))
+    flakiness: float = test.get("flakiness_rate", 0.0)
+
+    # Direct coverage: max risk_multiplier across sprint stories that overlap
+    direct_mult = 0.0
+    for story in stories:
+        if coverage_areas & set(story.get("changed_areas", [])):
+            risk = story.get("risk", "low")
+            mult = RISK_MULTIPLIERS.get(risk, 0.0)
+            direct_mult = max(direct_mult, mult)
+
+    # Dependency coverage: max risk_multiplier × 0.5 across resolved_deps
+    dep_mult = 0.0
+    for story in stories:
+        for dep in story.get("resolved_deps", []):
+            if coverage_areas & set(dep.get("changed_areas", [])):
+                risk = dep.get("risk", "low")
+                mult = RISK_MULTIPLIERS.get(risk, 0.0) * DEP_DISCOUNT
+                dep_mult = max(dep_mult, mult)
+
+    # Exploratory match: 1 if any coverage_area ∈ session risk_areas
+    exploratory_match = 0.0
+    for session in exploratory_sessions:
+        if coverage_areas & set(session.get("risk_areas", [])):
+            exploratory_match = 1.0
+            break
+
+    direct_score = 10.0 * (1.0 if direct_mult > 0 else 0.0) * direct_mult
+    dep_score = 5.0 * (1.0 if dep_mult > 0 else 0.0) * dep_mult
+    exploratory_score = 3.0 * exploratory_match
+    flakiness_penalty = 8.0 * flakiness
+
+    return direct_score + dep_score + exploratory_score - flakiness_penalty
+
+
+def _check_override(
+    test: dict,
+    mandatory_tags: set[str],
+    nfr_elevation: bool,
+) -> tuple[bool, str | None]:
+    """Return (is_override, reason) for this test."""
+    tags: set[str] = set(test.get("tags", []))
+    if mandatory_tags & tags:
+        matching = sorted(mandatory_tags & tags)
+        return True, f"mandatory-tag:{','.join(matching)}"
+
+    if nfr_elevation and test.get("layer") in NFR_LAYERS:
+        return True, "nfr-elevation"
+
+    return False, None
+
+
+def _build_unique_coverage(tests: list[dict]) -> set[str]:
+    """Return the set of coverage_areas that appear in exactly one test."""
+    from collections import Counter
+    area_counts: Counter = Counter()
+    for test in tests:
+        for area in test.get("coverage_areas", []):
+            area_counts[area] += 1
+    return {area for area, count in area_counts.items() if count == 1}
+
+
+def _find_retire_candidates(
+    tests: list[dict],
+    retire_threshold: float,
+    unique_coverage: set[str],
+) -> set[str]:
+    """Return ids of tests that are retire candidates.
+
+    A test is a retire candidate iff:
+    - automated == True
+    - flakiness_rate > retire_threshold
+    - has NO unique coverage (none of its areas are in unique_coverage)
+    """
+    retire_ids: set[str] = set()
+    for test in tests:
+        if not test.get("automated", True):
+            continue
+        if test.get("flakiness_rate", 0.0) <= retire_threshold:
+            continue
+        test_areas = set(test.get("coverage_areas", []))
+        if test_areas & unique_coverage:
+            continue  # has unique coverage — do not retire
+        retire_ids.add(test["id"])
+    return retire_ids
+
+
+def _apply_budget_constraint(
+    scored_must_run: list[ScoredTest],
+    all_tests: list[dict],
+    budget_mins: float,
+) -> tuple[list[ScoredTest], list[ScoredTest], bool]:
+    """Demote lowest-scored must-run tests until total fits within budget.
+
+    Returns (remaining_must_run, demoted, overflow_occurred).
+    Only automated tests consume budget.
+    """
+    exec_map: dict[str, float] = {
+        t["id"]: t.get("execution_time_secs", 0) / 60.0
+        for t in all_tests
+        if t.get("automated", True)
+    }
+
+    budget_mins_f = float(budget_mins)
+    total = sum(exec_map.get(s.test_id, 0.0) for s in scored_must_run)
+
+    if total <= budget_mins_f:
+        return scored_must_run, [], False
+
+    # Sort ascending by raw_score — demote lowest first
+    sorted_must = sorted(scored_must_run, key=lambda s: s.raw_score)
+    remaining: list[ScoredTest] = list(sorted_must)
+    demoted: list[ScoredTest] = []
+
+    while total > budget_mins_f and remaining:
+        candidate = remaining.pop(0)  # lowest score
+        total -= exec_map.get(candidate.test_id, 0.0)
+        demoted.append(candidate)
+
+    return remaining, demoted, True

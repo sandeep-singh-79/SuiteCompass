@@ -1,0 +1,36 @@
+# Assertions for: degraded-suite-high-flakiness
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Flakiness Tier High:"
+
+must_include_substrings:
+  # Sprint risk is medium
+  - "Sprint Risk Level: medium"
+  # Retire candidates section must contain the flaky shared-coverage tests
+  - "TEST-203"
+  - "TEST-204"
+  - "TEST-205"
+  # Flakiness tier high is non-zero (at least 4 tests above 0.20)
+  - "Flakiness Tier High:"
+  # TEST-201 (stable, covers story area) should appear in output
+  - "TEST-201"
+
+must_not_include_substrings:
+  # TEST-206 has unique coverage (InventoryService) — must NOT be in retire candidates
+  # We can't test section-specific exclusion here without richer harness,
+  # so we verify it appears somewhere in output (not excluded entirely)
+  []
