@@ -102,9 +102,10 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Phase 1 MVP (T1-T12) COMPLETE. Committed on branch `phase-1-deterministic-core` (HEAD: 281d27b).
-- 159 tests passing, 99.07% coverage.
-- Next: decide whether to merge feature branch to master or start Phase 2 (LLM integration planning).
+- Phase 1 MVP (T1-T12) COMPLETE. Committed on branch `phase-1-deterministic-core`.
+- Review fixes applied: temp-path compliance, input validation, retire-candidate flakiness display.
+- 166 tests passing, 99.10% coverage.
+- Next: Phase 2 documentation and learning tutorials (D1-D9 in plan.md).
 
 ## Blockers
 - None.
@@ -114,12 +115,13 @@ Required labels (7, section-aware):
 - T2: Product definition
 - T3: Python scaffold (11 tests)
 - T4: Output contract / output_validator.py (21 tests)
-- T5: input_loader.py (22 tests)
+- T5: input_loader.py (22 tests → 29 after review fixes)
 - T6: context_classifier.py (17 tests)
 - T7: scoring_engine.py (34 tests)
-- T8: renderer.py + integration (18 tests)
-- T9: Benchmark YAMLs (3 scenarios × 2 files)
+- T8: renderer.py + integration (18 tests → 19 after review fixes)
+- T9: Benchmark YAMLs (3 scenarios x 2 files)
 - T10: end_to_end_flow.py + benchmark_runner.py (11 tests)
-- T11: cli.py with `iro run` and `iro benchmark` subcommands (13 tests)
-- T12: Coverage hardening — all modules >=90%, total 99.07% (159 tests)
+- T11: cli.py with `iro run` and `iro benchmark` subcommands (14 tests)
+- T12: Coverage hardening — all modules >=90%, total 99.10% (166 tests)
+- Review fixes: temp-path compliance (repo_tmp fixture), input validation (name required, list-type checks), retire display (actual flakiness_rate)
 

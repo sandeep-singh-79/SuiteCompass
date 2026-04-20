@@ -37,11 +37,16 @@ def _validate_story(story: dict, index: int) -> None:
             f"Invalid risk value {story['risk']!r} in {ctx}. "
             f"Must be one of {sorted(VALID_RISK_VALUES)}"
         )
+    dep_stories = story.get("dependency_stories", [])
+    if not isinstance(dep_stories, list):
+        raise InputValidationError(
+            f"dependency_stories must be a list in {ctx}, got {type(dep_stories).__name__}"
+        )
 
 
 def _validate_test(test: dict, index: int) -> None:
     ctx = f"test_suite[{index}]"
-    _require_keys(test, ["id", "layer", "coverage_areas", "execution_time_secs", "flakiness_rate"], ctx)
+    _require_keys(test, ["id", "name", "layer", "coverage_areas", "execution_time_secs", "flakiness_rate"], ctx)
 
     exec_time = test["execution_time_secs"]
     if not isinstance(exec_time, (int, float)) or exec_time < 0:
@@ -107,15 +112,31 @@ def load_input(path: str) -> InputPackage:
     sprint = raw["sprint_context"]
     _require_keys(sprint, ["stories"], "sprint_context")
 
-    # Validate stories
-    stories: list[dict] = sprint.get("stories", [])
+    # Validate stories is a list
+    stories = sprint.get("stories", [])
+    if not isinstance(stories, list):
+        raise InputValidationError(
+            f"sprint_context.stories must be a list, got {type(stories).__name__}"
+        )
     for i, story in enumerate(stories):
         _validate_story(story, i)
 
-    # Validate tests
-    test_suite: list[dict] = raw.get("test_suite", [])
+    # Validate test_suite is a list
+    test_suite = raw.get("test_suite", [])
+    if not isinstance(test_suite, list):
+        raise InputValidationError(
+            f"test_suite must be a list, got {type(test_suite).__name__}"
+        )
     for i, test in enumerate(test_suite):
         _validate_test(test, i)
+
+    # Validate mandatory_tags is a list if present
+    constraints = raw.get("constraints", {})
+    mandatory_tags = constraints.get("mandatory_tags", [])
+    if not isinstance(mandatory_tags, list):
+        raise InputValidationError(
+            f"constraints.mandatory_tags must be a list, got {type(mandatory_tags).__name__}"
+        )
 
     # Resolve 1-hop dependencies
     resolved_stories = _resolve_deps(stories)

@@ -70,6 +70,7 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
             is_override=override,
             override_reason=reason,
             is_manual=is_manual,
+            flakiness_rate=test.get("flakiness_rate", 0.0),
         ))
 
     # --- 3. Identify retire candidates -------------------------------------

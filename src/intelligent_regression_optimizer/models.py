@@ -37,6 +37,7 @@ class ScoredTest:
     is_override: bool
     override_reason: str | None
     is_manual: bool
+    flakiness_rate: float = 0.0
 
 
 @dataclass
