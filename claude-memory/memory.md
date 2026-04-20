@@ -47,11 +47,63 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 - Input for MVP: synthetic test metadata YAML. Real JUnit XML ingestion layered on after core scoring algorithm is proven.
 - Cross-system reuse from QEStrategyForge: FlowResult, EXIT_* constants, benchmark_runner pattern, pyproject.toml structure, conftest.py pattern. Copy-adapt; do not rebuild.
 
+## Product Definition
+- **Problem:** Sprint delivery teams carry oversized regression suites that burn CI time and delay releases. Manual triage is ad-hoc and inconsistent. This tool analyses synthetic sprint + test-suite metadata to recommend which tests to run, defer, or retire for a given sprint, and to surface suite health signals.
+- **Inputs:** YAML document with sprint context (stories, risk, changed areas, dependency stories), test suite (id, layer, coverage areas, execution time, flakiness, failure count), exploratory session notes, and constraints (budget, mandatory tags, flakiness thresholds).
+- **Outputs:** Structured markdown report with 6 sections and 7 labelled summary values.
+- **Non-goals (Phase 1):** JUnit XML ingestion, SCM integration, JIRA integration, LLM narrative, multi-hop deps, fuzzy area matching.
+
+## Decisions Made (MVP — locked 2026-04-17)
+- Scoring single weight: `risk`. `type` carries no scoring impact in Phase 1.
+- Dependency traversal: 1-hop only.
+- NFR elevation: any story with risk=high → all tests with layer=performance or layer=security are must-run overrides.
+- Exploratory session notes are MVP input. Areas flagged by exploratory sessions amplify scores.
+- Mandatory tags always produce must-run override regardless of score.
+- Hard overrides (mandatory tag, NFR elevation) are exempt from the time budget.
+- Budget overflow: lowest-scored scored-must-run test demotes to should-run; `Budget Overflow:` label set to Yes.
+- Unique coverage is a global suite property: a test has unique coverage if ≥1 of its coverage_areas is not covered by any other test.
+- Only automated tests with flakiness above threshold AND no unique coverage are retire candidates.
+- Manual tests (automated: false): scored + tiered, excluded from budget calc, never in Retire Candidates, tagged `(manual)` in output.
+- coverage_areas matching: exact string equality for Phase 1.
+- Story `type` zero scoring impact in Phase 1 (carried for Phase 2+).
+- Scoring weights hardcoded for Phase 1. No config file.
+
+## Scoring Formula (locked)
+```
+raw_score = (10 × direct_coverage × risk_multiplier)
+          + (5  × dep_coverage × dep_risk_multiplier)
+          + (3  × exploratory_match)
+          - (8  × flakiness_rate)
+
+risk_multiplier:     high=1.0, medium=0.6, low=0.3
+dep_risk_multiplier: same scale × 0.5
+direct_coverage:     1 if any coverage_area ∩ story.changed_areas, else 0
+dep_coverage:        1 if any coverage_area ∩ dep_story.changed_areas, else 0
+explanatory_match:   1 if any coverage_area ∈ session risk_areas, else 0
+```
+Tier thresholds: must-run ≥ 8, should-run ≥ 4, defer < 4.
+
+## Output Contract (locked)
+Required headings (6, line-anchored):
+- `## Optimisation Summary`
+- `## Must-Run`
+- `## Should-Run If Time Permits`
+- `## Defer To Overnight Run`
+- `## Retire Candidates`
+- `## Suite Health Summary`
+
+Required labels (7, section-aware):
+- `Recommendation Mode:` → Optimisation Summary
+- `Sprint Risk Level:` → Optimisation Summary
+- `Total Must-Run:` → Optimisation Summary
+- `Total Retire Candidates:` → Optimisation Summary
+- `NFR Elevation:` → Optimisation Summary
+- `Budget Overflow:` → Optimisation Summary
+- `Flakiness Tier High:` → Suite Health Summary
+
 ## Active Next Work
-- Write product definition: problem statement, inputs, outputs, non-goals.
-- Define MVP scope: first user-visible flow, binary success condition.
-- Scaffold Python package structure.
+- Implementation is in progress. See plan.md for current step.
 
 ## Blockers
-- None. Repo just initialised.
+- None.
 

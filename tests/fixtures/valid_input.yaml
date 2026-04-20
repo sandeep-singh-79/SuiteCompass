@@ -1,0 +1,68 @@
+sprint_context:
+  sprint_id: SPRINT-42
+  stories:
+    - id: PROJ-1100
+      title: Add retry logic to PaymentService
+      risk: high
+      type: feature
+      changed_areas:
+        - PaymentService
+        - RetryHandler
+      dependency_stories:
+        - PROJ-1099
+    - id: PROJ-1099
+      title: Refactor OrderFacade
+      risk: medium
+      type: refactor
+      changed_areas:
+        - OrderFacade
+        - PaymentService
+      dependency_stories: []
+  exploratory_sessions:
+    - session_id: EX-07
+      tester: alice
+      risk_areas:
+        - RetryHandler
+        - PaymentService
+      notes: "Observed intermittent timeouts under load"
+
+test_suite:
+  - id: TEST-001
+    name: payment flow e2e
+    layer: e2e
+    coverage_areas:
+      - PaymentService
+      - OrderFacade
+    execution_time_secs: 120
+    flakiness_rate: 0.05
+    failure_count_last_30d: 1
+    automated: true
+    tags: []
+  - id: TEST-002
+    name: retry handler integration
+    layer: integration
+    coverage_areas:
+      - RetryHandler
+    execution_time_secs: 45
+    flakiness_rate: 0.02
+    failure_count_last_30d: 0
+    automated: true
+    tags:
+      - critical-flow
+  - id: TEST-003
+    name: payment service security
+    layer: security
+    coverage_areas:
+      - PaymentService
+    execution_time_secs: 90
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+constraints:
+  time_budget_mins: 20
+  mandatory_tags:
+    - critical-flow
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20
