@@ -366,3 +366,114 @@ class TestParseBoolBranches:
         p = _save_tmp(wb, "empty_name.xlsx")
         with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Nn]ame"):
             load_excel(str(p))
+
+
+# ---------------------------------------------------------------------------
+# Passthrough columns — Priority, External ID, Owner, Module
+# ---------------------------------------------------------------------------
+
+class TestPassthroughColumns:
+    def test_template_has_passthrough_fields(self):
+        tests = load_excel(str(TEMPLATES / "test_suite_template.xlsx"))
+        t = tests[0]
+        assert t["priority"] == "P0"
+        assert t["external_id"] == "JIRA-101"
+        assert t["owner"] == "alice"
+        assert t["module"] == "Payment"
+
+    def test_passthrough_fields_present_when_absent_in_sheet(self):
+        """Columns not in sheet → fields returned as None."""
+        wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", ""]])
+        p = _save_tmp(wb, "no_passthrough.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["priority"] is None
+        assert tests[0]["external_id"] is None
+        assert tests[0]["owner"] is None
+        assert tests[0]["module"] is None
+
+    def test_passthrough_fields_empty_cell_returns_none(self):
+        """Empty cells in passthrough columns → None."""
+        headers = [
+            "ID", "Name", "Layer", "Coverage Areas",
+            "Execution Time (secs)", "Flakiness Rate",
+            "Failure Count (30d)", "Automated", "Tags",
+            "Priority", "External ID", "Owner", "Module",
+        ]
+        wb = _make_wb(
+            headers=headers,
+            rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", "", "", "", "", ""]],
+        )
+        p = _save_tmp(wb, "passthrough_empty.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["priority"] is None
+        assert tests[0]["external_id"] is None
+        assert tests[0]["owner"] is None
+        assert tests[0]["module"] is None
+
+    def test_passthrough_values_preserved_as_strings(self):
+        headers = [
+            "ID", "Name", "Layer", "Coverage Areas",
+            "Execution Time (secs)", "Flakiness Rate",
+            "Failure Count (30d)", "Automated", "Tags",
+            "Priority", "External ID", "Owner", "Module",
+        ]
+        wb = _make_wb(
+            headers=headers,
+            rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", "",
+                   "P1", "JIRA-999", "qeteam", "OrderManagement"]],
+        )
+        p = _save_tmp(wb, "passthrough_values.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["priority"] == "P1"
+        assert tests[0]["external_id"] == "JIRA-999"
+        assert tests[0]["owner"] == "qeteam"
+        assert tests[0]["module"] == "OrderManagement"
+
+    def test_passthrough_whitespace_stripped(self):
+        headers = [
+            "ID", "Name", "Layer", "Coverage Areas",
+            "Execution Time (secs)", "Flakiness Rate",
+            "Failure Count (30d)", "Automated", "Tags",
+            "Priority", "External ID", "Owner", "Module",
+        ]
+        wb = _make_wb(
+            headers=headers,
+            rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", "",
+                   "  P2  ", "  TR-42  ", "  alice  ", "  Payment  "]],
+        )
+        p = _save_tmp(wb, "passthrough_whitespace.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["priority"] == "P2"
+        assert tests[0]["external_id"] == "TR-42"
+        assert tests[0]["owner"] == "alice"
+        assert tests[0]["module"] == "Payment"
+
+    def test_module_fuzzy_alias_component(self):
+        headers = [
+            "ID", "Name", "Layer", "Coverage Areas",
+            "Execution Time (secs)", "Flakiness Rate",
+            "Failure Count (30d)", "Automated", "Tags",
+            "Component",
+        ]
+        wb = _make_wb(
+            headers=headers,
+            rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", "", "PaymentGateway"]],
+        )
+        p = _save_tmp(wb, "module_alias_component.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["module"] == "PaymentGateway"
+
+    def test_external_id_fuzzy_alias_jira(self):
+        headers = [
+            "ID", "Name", "Layer", "Coverage Areas",
+            "Execution Time (secs)", "Flakiness Rate",
+            "Failure Count (30d)", "Automated", "Tags",
+            "Jira",
+        ]
+        wb = _make_wb(
+            headers=headers,
+            rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "true", "", "PAY-55"]],
+        )
+        p = _save_tmp(wb, "extid_alias_jira.xlsx")
+        tests = load_excel(str(p))
+        assert tests[0]["external_id"] == "PAY-55"
