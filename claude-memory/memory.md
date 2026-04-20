@@ -10,7 +10,7 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
 - Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter (all tracks A1-A6) COMPLETE. Phase 2 documentation COMPLETE.
-- Active branch: `phase-3-merge-utility` (HEAD includes A4 merge utility).
+- Active branch: `docs-fix-review-gaps` pushed and complete. Branch `master` is next merge target.
 
 ## Decisions Made
 
