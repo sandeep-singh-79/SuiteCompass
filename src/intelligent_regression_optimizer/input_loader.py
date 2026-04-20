@@ -125,6 +125,16 @@ def validate_raw(raw: dict[str, Any]) -> dict[str, Any]:
     for i, test in enumerate(test_suite):
         _validate_test(test, i)
 
+    # Check for duplicate test IDs
+    seen_ids: set[str] = set()
+    for test in test_suite:
+        tid = test["id"]
+        if tid in seen_ids:
+            raise InputValidationError(
+                f"Duplicate test_id {tid!r} in test_suite"
+            )
+        seen_ids.add(tid)
+
     # Validate mandatory_tags is a list if present
     constraints = raw.get("constraints", {})
     mandatory_tags = constraints.get("mandatory_tags", [])
