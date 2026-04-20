@@ -68,6 +68,26 @@ Message: fix: address review — temp-path compliance, input validation, retire 
 
 Mirrors the documentation and learning layer built for QEStrategyForge.
 
+**Objective:** Provide complete documentation for all implemented functionality (Phase 1 + Phase 3) plus a domain learning tutorial.
+
+**Deliverables:** 9 documentation files (D1–D9) covering usage, schemas, decision rules, scenarios, validation, learning, and retrospective.
+
+**Dependencies:** Phase 1 deterministic core (scoring formula, output contract, CLI) and Phase 3 Excel adapter (import-tests command, template, column mapping).
+
+**Success Metrics:**
+- README quick-start works from a fresh clone (`iro run tests/fixtures/valid_input.yaml` exits 0)
+- USAGE-GUIDE covers all 3 CLI subcommands, all flags, all exit codes (0/1/2)
+- V1-INPUT-TEMPLATE documents every validated field from `input_loader.py`
+- V1-OUTPUT-TEMPLATE lists all 6 headings + 7 labels from `output_validator.py`
+- DECISION-RULES scoring formula matches `memory.md` verbatim
+- SCENARIO-LIBRARY has ≥6 named scenarios with context + expected behaviour
+- VALIDATION-HARNESS assertion schema fully documented
+- LEARNING-GUIDE has ≥5 sections + ≥3 hands-on exercises
+- PHASED-IMPLEMENTATION has Phase 1 + Phase 3 retrospectives
+- All doc files cross-linked from README documentation index
+
+**Exit Criteria:** All 9 doc tracks marked Complete; all success metrics pass; governance artifacts (plan.md, memory.md) updated to reflect delivery.
+
 ### Doc Tracks
 
 | Track | Goal | Status | Notes |
