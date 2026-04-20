@@ -11,9 +11,9 @@
 | Field | Value |
 |---|---|
 | Capability | intelligent-regression-optimizer |
-| Objective | Phase 3 Excel Adapter Spike COMPLETE |
-| Current Phase | Phase 3 Spike Done — ready for Phase 2 documentation |
-| Current Focus | Phase 2 documentation (D1-D9) — branch from phase-3-excel-adapter |
+| Objective | Phase 2 Documentation COMPLETE |
+| Current Phase | Phase 1 + Phase 3 + Phase 2 all Done |
+| Current Focus | Review + merge to main |
 | Last Updated | 2026-04-20 |
 
 ---
@@ -72,15 +72,15 @@ Mirrors the documentation and learning layer built for QEStrategyForge.
 
 | Track | Goal | Status | Notes |
 |---|---|---|---|
-| D1 - README | Repo overview, install, quick-start, CLI reference | Not Started | Public-facing entry point |
-| D2 - USAGE-GUIDE | End-to-end run instructions, exit codes, flags, modes | Not Started | Mirror QEStrategyForge pattern |
-| D3 - V1-INPUT-TEMPLATE | Full input schema with field-level annotations | Not Started | Canonical input reference |
-| D4 - V1-OUTPUT-TEMPLATE | Annotated sample output report | Not Started | All 6 sections + 7 labels explained |
-| D5 - DECISION-RULES | Scoring formula, tier logic, override rules, retire logic | Not Started | Machine-checkable rules, not prose |
-| D6 - SCENARIO-LIBRARY | 6+ named scenarios with context, expected output shape, and tradeoffs | Not Started | Mirror QEStrategyForge SITUATIONS-CATALOGUE |
-| D7 - VALIDATION-HARNESS | How benchmarks work, how to add a new one, pass/fail criteria | Not Started | Developer guide |
-| D8 - LEARNING-GUIDE | How to think about regression prioritisation; suite health concepts | Not Started | Tutorial layer — teaches the domain, not just the tool |
-| D9 - PHASED-IMPLEMENTATION | Retrospective: what was built in each phase and why | Not Started | Architectural decision log |
+| D1 - README | Repo overview, install, quick-start, CLI reference | Complete | Public-facing entry point |
+| D2 - USAGE-GUIDE | End-to-end run instructions, exit codes, flags, modes | Complete | Covers all 3 subcommands + Excel import workflow |
+| D3 - V1-INPUT-TEMPLATE | Full input schema with field-level annotations | Complete | Canonical input reference incl. passthrough fields |
+| D4 - V1-OUTPUT-TEMPLATE | Annotated sample output report | Complete | All 6 sections + 7 labels explained |
+| D5 - DECISION-RULES | Scoring formula, tier logic, override rules, retire logic | Complete | Machine-checkable rules with full formula |
+| D6 - SCENARIO-LIBRARY | 6+ named scenarios with context, expected output shape, and tradeoffs | Complete | 7 named scenarios + comparison matrix |
+| D7 - VALIDATION-HARNESS | How benchmarks work, how to add a new one, pass/fail criteria | Complete | Developer guide with step-by-step |
+| D8 - LEARNING-GUIDE | How to think about regression prioritisation; suite health concepts | Complete | 6 sections + 5 hands-on exercises |
+| D9 - PHASED-IMPLEMENTATION | Retrospective: what was built in each phase and why | Complete | Architecture decision log + Phase 1/3/2 retros |
 
 ### Learning Tutorial Scope (D8 — LEARNING-GUIDE)
 
