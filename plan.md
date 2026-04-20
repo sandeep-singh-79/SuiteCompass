@@ -61,3 +61,56 @@ Message: feat: T7-T12 complete -- scoring, renderer, benchmarks, E2E, CLI (159 t
 - Option A: Merge phase-1-deterministic-core to master
 - Option B: Begin Phase 2 scoping (LLM narrative integration, real JUnit XML ingestion)
 - Option C: Publish the package (pypi, documentation)
+
+---
+
+## Phase 2 — Documentation and Learning Tutorials
+
+Mirrors the documentation and learning layer built for QEStrategyForge.
+
+### Doc Tracks
+
+| Track | Goal | Status | Notes |
+|---|---|---|---|
+| D1 - README | Repo overview, install, quick-start, CLI reference | Not Started | Public-facing entry point |
+| D2 - USAGE-GUIDE | End-to-end run instructions, exit codes, flags, modes | Not Started | Mirror QEStrategyForge pattern |
+| D3 - V1-INPUT-TEMPLATE | Full input schema with field-level annotations | Not Started | Canonical input reference |
+| D4 - V1-OUTPUT-TEMPLATE | Annotated sample output report | Not Started | All 6 sections + 7 labels explained |
+| D5 - DECISION-RULES | Scoring formula, tier logic, override rules, retire logic | Not Started | Machine-checkable rules, not prose |
+| D6 - SCENARIO-LIBRARY | 6+ named scenarios with context, expected output shape, and tradeoffs | Not Started | Mirror QEStrategyForge SITUATIONS-CATALOGUE |
+| D7 - VALIDATION-HARNESS | How benchmarks work, how to add a new one, pass/fail criteria | Not Started | Developer guide |
+| D8 - LEARNING-GUIDE | How to think about regression prioritisation; suite health concepts | Not Started | Tutorial layer — teaches the domain, not just the tool |
+| D9 - PHASED-IMPLEMENTATION | Retrospective: what was built in each phase and why | Not Started | Architectural decision log |
+
+### Learning Tutorial Scope (D8 — LEARNING-GUIDE)
+
+The learning guide should teach regression suite thinking, not just tool usage. Cover:
+
+1. Why oversized regression suites hurt delivery
+   - CI time inflation
+   - flakiness noise masking real failures
+   - manual triage overhead
+2. How sprint context changes the right test selection
+   - risk level and coverage area matching
+   - NFR elevation triggers
+   - dependency test coverage
+3. Reading suite health signals
+   - flakiness rate thresholds
+   - failure count trends
+   - unique coverage as a retire signal
+4. How to interpret a SuiteCompass report
+   - must-run vs should-run vs defer
+   - retire candidates and what to do with them
+   - budget overflow and time pressure
+5. Common mistakes in regression prioritisation
+   - running everything by default
+   - ignoring flakiness until it is too late
+   - retiring tests without checking unique coverage
+
+### Doc Acceptance Criteria
+
+- README installs and runs end-to-end from a clean clone
+- USAGE-GUIDE covers all CLI flags, both subcommands, and all exit codes
+- SCENARIO-LIBRARY has >=6 named scenarios, each with context + expected behaviour
+- LEARNING-GUIDE has >=5 sections teaching regression thinking
+- All doc files are linked from README
