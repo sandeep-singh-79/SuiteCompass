@@ -237,6 +237,34 @@ class TestMergeValidationErrors:
         assert result.exit_code == EXIT_INPUT_ERROR
         assert "execution_time_secs" in result.output
 
+    def test_duplicate_test_id_in_merge_fails(self, sprint_file, repo_tmp):
+        dup_tests = {
+            "test_suite": [
+                {
+                    "id": "T-DUP",
+                    "name": "first",
+                    "layer": "unit",
+                    "coverage_areas": ["X"],
+                    "execution_time_secs": 10,
+                    "flakiness_rate": 0.0,
+                },
+                {
+                    "id": "T-DUP",
+                    "name": "second",
+                    "layer": "integration",
+                    "coverage_areas": ["Y"],
+                    "execution_time_secs": 20,
+                    "flakiness_rate": 0.1,
+                },
+            ]
+        }
+        tf = repo_tmp / "dup_tests.yaml"
+        tf.write_text(yaml.dump(dup_tests, sort_keys=False), encoding="utf-8")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "--tests", str(tf), "--sprint", str(sprint_file)])
+        assert result.exit_code == EXIT_INPUT_ERROR
+        assert "Duplicate test_id" in result.output
+
 
 class TestMergeRoundTrip:
     """Excel import → merge → run produces the same result as a combined file."""

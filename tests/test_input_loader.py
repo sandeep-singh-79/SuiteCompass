@@ -469,3 +469,61 @@ class TestMissingNameField:
         """)
         with pytest.raises(InputValidationError, match="name"):
             load_input(str(p))
+
+
+class TestDuplicateTestId:
+    def test_duplicate_test_id_raises(self):
+        p = _write_tmp("dup_id.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite:
+              - id: T1
+                name: first test
+                layer: unit
+                coverage_areas: [Foo]
+                execution_time_secs: 10
+                flakiness_rate: 0.01
+              - id: T1
+                name: duplicate test
+                layer: integration
+                coverage_areas: [Bar]
+                execution_time_secs: 20
+                flakiness_rate: 0.02
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="Duplicate test_id 'T1'"):
+            load_input(str(p))
+
+    def test_unique_test_ids_pass(self):
+        p = _write_tmp("unique_ids.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite:
+              - id: T1
+                name: first test
+                layer: unit
+                coverage_areas: [Foo]
+                execution_time_secs: 10
+                flakiness_rate: 0.01
+              - id: T2
+                name: second test
+                layer: integration
+                coverage_areas: [Bar]
+                execution_time_secs: 20
+                flakiness_rate: 0.02
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        pkg = load_input(str(p))
+        assert len(pkg.normalized["test_suite"]) == 2
