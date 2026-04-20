@@ -11,9 +11,9 @@
 | Field | Value |
 |---|---|
 | Capability | intelligent-regression-optimizer |
-| Objective | Phase 3 A4 Merge Utility COMPLETE |
-| Current Phase | Phase 1 + Phase 3 (all tracks) + Phase 2 all Done |
-| Current Focus | Commit and merge to master |
+| Objective | MVP SEALED |
+| Current Phase | All phases (1 + 2 + 3) complete |
+| Current Focus | None — capability sealed; moving to next system |
 | Last Updated | 2026-04-20 |
 
 ---

@@ -8,16 +8,20 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ---
 
 ## Open Questions
-- None currently blocking.
+- None. MVP sealed.
 
-## Deferred Items Log
-- Real JUnit XML ingestion deferred until synthetic YAML deterministic core is proven.
-- Fuzzy / hierarchical coverage_areas matching deferred to Phase 2 (SCM integration).
-- SCM integration (actual changed files from git diff) deferred to Phase 2.
-- Jira auto-populate sprint_context.stories deferred to Phase 4+ (not scoped).
-- LLM narrative layer deferred until deterministic pipeline is proven on all 3 benchmarks.
-- Story `type`-based scoring deferred to Phase 2+.
-- Multi-hop dependency traversal deferred to Phase 2.
+## Backlogged Items (not planned)
+- Real JUnit XML ingestion
+- Fuzzy / hierarchical coverage_areas matching
+- SCM integration (git diff → changed_areas)
+- Jira auto-populate sprint_context.stories
+- LLM narrative layer
+- Story `type`-based scoring
+- Multi-hop dependency traversal
+- CI pipeline (GitHub Actions)
+- PyPI publish
+
+These are permanently deferred unless the program revisits this capability.
 
 ## Working Notes
 - CLI entry point: `iro` via pyproject.toml scripts. Subcommands: `run <input.yaml>`, `run --tests <t.yaml> --sprint <s.yaml>`, `benchmark <input.yaml> <assertions.yaml>`, `import-tests <file.xlsx>`.

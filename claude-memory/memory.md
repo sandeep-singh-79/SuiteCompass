@@ -102,12 +102,11 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Phase 3 A4 merge utility COMPLETE on `phase-3-merge-utility`.
-  - `iro run --tests <file> --sprint <file>` merges two YAML files and runs the pipeline.
-  - `run_pipeline_from_merged()` added to end_to_end_flow.py; `validate_raw()` extracted from input_loader.py.
-  - 17 dedicated tests in `tests/test_cli_merge.py`.
-- All Phase 3 adapter tracks (A1–A6) now COMPLETE.
-- Next: merge `phase-3-merge-utility` → `master`; plan Phase 4+ if needed.
+- **MVP SEALED.** No further work planned on this repo.
+- All phases (1 + 2 + 3) delivered, merged to master, tagged v0.3.0.
+- 248 tests, 97.7% coverage, 58 benchmark assertions green.
+- Deferred items (LLM narrative, JUnit XML, SCM, Jira, multi-hop) permanently backlogged.
+- Program focus moves to next capability system.
 
 ## Blockers
 - None.
