@@ -238,3 +238,14 @@ The backlog below represents possible future directions but is not planned work.
 | Configurable scoring weights | Single well-tuned formula more useful than configurable one for MVP |
 | CI pipeline / GitHub Actions | Not blocking for portfolio showcasing |
 | PyPI publish | Not blocking for current use case |
+
+---
+
+## Documentation Backlog (low priority)
+
+Improvements flagged during post-MVP review. Not planned; prioritise if the tool gains real users.
+
+| Item | Where | Description |
+|---|---|---|
+| Troubleshooting signals section | USAGE-GUIDE | `Total Must-Run: 0` → coverage string mismatch; `Budget Overflow` → check execution times; validation error → schema issue; unexpected retire candidate → check unique coverage |
+| Version/phase stamp | USAGE-GUIDE, LEARNING-GUIDE, SCENARIO-LIBRARY | "Applies to: v0.3.0 / Phases 1–3" block at top of each guide |
