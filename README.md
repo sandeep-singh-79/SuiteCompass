@@ -64,6 +64,8 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | [SCENARIO-LIBRARY](docs/SCENARIO-LIBRARY.md) | Named scenarios with expected behaviour and tradeoffs |
 | [VALIDATION-HARNESS](docs/VALIDATION-HARNESS.md) | Benchmark system guide — how to run and add assertions |
 | [LEARNING-GUIDE](docs/LEARNING-GUIDE.md) | Tutorial: regression prioritisation thinking |
+| [SCORING-FORMULA](docs/SCORING-FORMULA.md) | Full formula derivation with weights, examples, and edge cases |
+| [BENCHMARK-AUTHORING](docs/BENCHMARK-AUTHORING.md) | How to write and validate new benchmark scenarios |
 | [PHASED-IMPLEMENTATION](docs/PHASED-IMPLEMENTATION.md) | Architecture retrospective and decision log |
 
 ## Development Status

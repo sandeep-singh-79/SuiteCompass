@@ -42,6 +42,8 @@ Input YAML
 - NFR elevation bypasses scoring entirely — performance and security tests run unconditionally when sprint risk is high.
 - Budget overflow trims from the bottom of must-run, never from overrides.
 
+For the complete formula derivation with worked examples, see [SCORING-FORMULA](SCORING-FORMULA.md). For writing benchmarks that validate this pipeline, see [BENCHMARK-AUTHORING](BENCHMARK-AUTHORING.md).
+
 ---
 
 ## 1. Why Oversized Regression Suites Hurt Delivery
