@@ -13,7 +13,7 @@ $$
 | Symbol | Name | Range | Source |
 |---|---|---|---|
 | $d_m$ | direct risk multiplier | 0.0, 0.3, 0.6, 1.0 | highest-risk story whose `changed_areas` overlap the test's `coverage_areas` |
-| $p_m$ | dependency risk multiplier | 0.0, 0.15, 0.30, 0.50 | `d_m × 0.5` for resolved dependency stories |
+| $p_m$ | dependency risk multiplier | 0.0, 0.15, 0.30, 0.50 | dep story's own risk multiplier × 0.5 (independent of $d_m$) |
 | $e$ | exploratory match | 0 or 1 | 1 if any `coverage_area` appears in any exploratory session's `risk_areas` |
 | $f$ | flakiness rate | 0.0 – 1.0 | `flakiness_rate` field on the test |
 
@@ -58,6 +58,20 @@ Dependency stories are resolved at input load time from `dependency_stories` IDs
 **Why the 0.5 discount?** Dependency-triggered coverage is one hop removed from the actual change. It matters, but less directly than the primary story. The discount keeps dependency tests from crowding out directly-relevant tests under budget pressure.
 
 **Example:** Story A depends on Story B (`risk: medium`, changes `OrderFacade`). Test covers `[OrderFacade]` only. Dep multiplier = 0.3 × 0.5 = 0.15 → dep score = **0.75**. Total score = 0 + 0.75 + 0 - penalty. This typically lands in Defer — dep coverage alone rarely reaches Should-Run unless exploratory bonus also fires.
+
+**Additive case — direct and dependency scores combine.** A test whose `coverage_areas` overlap *both* a primary story's changed areas and a dependency story's changed areas receives both scores:
+
+```
+# Test covers [SharedComponent], which appears in both Story A (direct) and Story B (dep)
+direct_score = 10.0 × 1.0   = 10.0   (Story A: risk high)
+dep_score    =  5.0 × 0.30  =  1.5   (Story B: risk medium, dep discount 0.5)
+──────────────────────────────────────
+combined before penalties    = 11.5
+```
+
+This is the most common path to high scores for shared infrastructure components — they receive both direct and dependency contributions simultaneously.
+
+**Theoretical score range:** Minimum = −8.0 (zero coverage, max flakiness). Maximum ≈ 15.5 (high-risk direct 10.0 + high-risk dep 2.5 + exploratory 3.0 + zero flakiness). Override rules can place tests in Must-Run at any score.
 
 ---
 
@@ -151,15 +165,15 @@ Retire candidates are evaluated **before** tiering: a test flagged for retiremen
 
 ---
 
-## Stability Score (classification-only, not used for tiering)
+## Stability Score (classification-only, not rendered)
 
-The classifier computes a per-test stability score for informational purposes:
+The classifier computes a per-test stability score:
 
 ```
 stability_score = 1.0 - (0.7 × flakiness_rate + 0.3 × min(failure_count_last_30d / 10, 1.0))
 ```
 
-This value is derived from context classification but is **not used in scoring or tiering**. It is available for rendering and future extensions.
+This value is **not used in scoring, tiering, or any report output**. It is an internal classification artefact computed during context analysis and available for future rendering extensions. It does not appear anywhere in the Markdown report — the flakiness penalty in the main formula serves as the report-visible signal.
 
 ---
 
@@ -212,7 +226,7 @@ score = 6.0 + 3.0 − 0.4 = 8.6  →  Must-Run
 ```
 Without the exploratory session: 6.0 − 0.4 = **5.6 → Should-Run**. The +3 bonus was the deciding factor.
 
-### Example D — Flaky test demoted to Should-Run despite high-risk coverage
+### Example D — Flaky high-risk test: two outcomes depending on unique coverage
 
 Input:
 - Story: `risk: high`, `changed_areas: [Checkout]`
@@ -222,6 +236,13 @@ Input:
 direct_score      = 10.0 × 1.0 = 10.0
 flakiness_penalty = 8.0 × 0.32 = 2.56
 ─────────────────────────────────────────
-score = 7.44  →  Should-Run
+raw score = 7.44
 ```
-If `flakiness_rate > flakiness_retire_threshold` (0.30 by default) AND no unique coverage → retire candidate instead (retire check happens before tiering, so this test would never reach Should-Run).
+
+**Case 1 — test has unique coverage** (it is the only test covering `Checkout`):
+Retire check passes (condition 3 fails — unique coverage exists). Score 7.44 → **Should-Run**.
+Action: fix the flakiness. This test cannot be retired without leaving Checkout uncovered.
+
+**Case 2 — test has no unique coverage** (another test also covers `Checkout`):
+Retire check: `automated: true` ✓, `flakiness_rate 0.32 > threshold 0.30` ✓, no unique coverage ✓ → **Retire Candidate**.
+The raw score of 7.44 is never used — retire evaluation happens before tiering. The test does not appear in any scored tier.

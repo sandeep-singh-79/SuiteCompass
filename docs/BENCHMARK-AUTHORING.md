@@ -158,7 +158,11 @@ must_include_substrings:
 ```
 
 **`must_not_include_substrings`**  
-Assert things that must NOT be in the output. Use sparingly but it is the only way to assert a test is NOT in a section, or that a specific error doesn't appear.
+Assert things that must NOT be in the output. Use when the *absence* of something is part of the scenario's correctness guarantee — typically:
+- A manual test must never appear as a retire candidate
+- A test with unique coverage must never be retired
+- Budget overflow must not fire when the budget is generous
+- A specific validation error must not appear with valid input
 
 ```yaml
 must_not_include_substrings:
@@ -167,6 +171,8 @@ must_not_include_substrings:
   # A test with unique coverage must not be retired
   - "TEST-206 flaky inventory unique check (flakiness:"
 ```
+
+**Limitation — section membership cannot be directly asserted.** There is no `must_include_in_section` assertion type. The runner operates on the full rendered string, not a parsed section model. When you need to confirm a test is in Must-Run (not just anywhere in the output), use `must_not_include_substrings` to exclude the test from the retire candidate pattern — that is the closest available proxy.
 
 ### What Not to Assert
 
@@ -213,15 +219,43 @@ iro run benchmarks/my-scenario.input.yaml
 - Remaining scored tests demoted to Should-Run
 - `Budget Overflow: Yes`
 
-**Assertions:**
+**Complete assertions file:**
 ```yaml
+# Assertions for: budget-overflow-demotion
+# Proves: scored must-run tests are demoted under budget pressure;
+#         NFR override test survives demotion unconditionally.
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Flakiness Tier High:"
+
 must_include_substrings:
-  - "Sprint Risk Level: high"
-  - "NFR Elevation: Yes"
-  - "Budget Overflow: Yes"
-  - "[override: nfr-elevation]"
-  - "TEST-SECURITY-01"           # override test always present
+  - "Sprint Risk Level: high"         # sprint is high-risk
+  - "NFR Elevation: Yes"              # NFR elevation active
+  - "Budget Overflow: Yes"            # budget was exceeded
+  - "[override: nfr-elevation]"       # security test survived demotion
+  - "TEST-SECURITY-01"                # override test present in must-run
+
+must_not_include_substrings:
+  # Override test must never be demoted to should-run
+  # (retire pattern: "flakiness: ..., no unique coverage" — security tests are never retired)
+  - "TEST-SECURITY-01 (flakiness:"
 ```
+
+Note: this worked example does not have a corresponding file in `benchmarks/` — it is illustrative. For a complete real pair, read `benchmarks/high-risk-feature-sprint.input.yaml` alongside `benchmarks/high-risk-feature-sprint.assertions.yaml`, which proves NFR elevation and mandatory-tag overrides in a similar high-risk shape.
 
 ---
 
