@@ -13,8 +13,8 @@
 | Capability | intelligent-regression-optimizer |
 | Objective | MVP SEALED |
 | Current Phase | All phases (1 + 2 + 3) complete |
-| Current Focus | None — capability sealed; moving to next system |
-| Last Updated | 2026-04-20 |
+| Current Focus | docs-fix-review-gaps branch merged; ready for next capability |
+| Last Updated | 2026-04-21 |
 
 ---
 

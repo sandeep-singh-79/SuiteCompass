@@ -6,6 +6,44 @@ This guide teaches the **domain**, not just the tool. After reading it, you shou
 
 ---
 
+## How SuiteCompass Thinks
+
+Every run follows the same five-step pipeline:
+
+```
+Input YAML
+    │
+    ▼
+1. Validation ── rejects malformed inputs early (wrong types, missing keys,
+    │             invalid enums, referential integrity)
+    ▼
+2. Classification ── reads sprint context to determine:
+    │                 sprint risk level (high / medium / low)
+    │                 NFR elevation flag (yes if any story is high-risk)
+    │                 suite health (flakiness rates, unique coverage map)
+    ▼
+3. Scoring ── assigns a numeric priority score to every test:
+    │          direct_coverage + dep_coverage + exploratory_bonus
+    │          − flakiness_penalty − stability_penalty
+    │          + mandatory/NFR overrides (budget-exempt, always must-run)
+    ▼
+4. Selection ── tiering by score threshold and budget:
+    │            ≥ 8.0 → Must-Run  (trimmed by budget if overflow)
+    │            4.0–7.9 → Should-Run
+    │            < 4.0 → Defer
+    │            retire conditions → Retire Candidates
+    ▼
+5. Rendering ── Markdown report with five sections + suite health summary
+```
+
+**What this means in practice:**
+- A test with no coverage overlap to any changed story will score near zero and land in Defer — correctly.
+- A test covering a high-risk story scores 3.3× higher than the same test covering a low-risk story.
+- NFR elevation bypasses scoring entirely — performance and security tests run unconditionally when sprint risk is high.
+- Budget overflow trims from the bottom of must-run, never from overrides.
+
+---
+
 ## 1. Why Oversized Regression Suites Hurt Delivery
 
 ### The Growth Problem

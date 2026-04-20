@@ -40,6 +40,23 @@ iro benchmark benchmarks/high-risk-feature-sprint.input.yaml \
 # Expected: OK — 21 checks passed.
 ```
 
+### Expected Output
+
+```
+Sprint Risk Level:     high
+NFR Elevation:         Yes
+Budget Overflow:       No
+Total Must-Run:        5  (4 automated + 1 manual)
+Total Retire Candidates: 0
+Automated time:        18 min  (budget: 20 min)
+```
+
+Key signals to observe:
+- 2 NFR override tests (performance + security) promoted regardless of score
+- 1 mandatory-tag override (`critical-flow`) — score is irrelevant, it always runs
+- 1 manual test appears in must-run but does **not** consume budget
+- `TEST-006 reporting dashboard` scores −0.4 (no coverage overlap) → correctly deferred
+
 Read `benchmarks/high-risk-feature-sprint.input.yaml` alongside the output to trace how each assertion maps to the scoring logic.
 
 ### Context
@@ -77,6 +94,23 @@ iro benchmark benchmarks/low-risk-bugfix-sprint.input.yaml \
 # Expected: OK — 18 checks passed.
 ```
 
+### Expected Output
+
+```
+Sprint Risk Level:     low
+NFR Elevation:         No
+Budget Overflow:       No
+Total Must-Run:        0
+Total Retire Candidates: 0
+Automated time:        0 min  (budget: 60 min)
+```
+
+Key signals to observe:
+- **Zero must-run tests** — the changed area has no tests scoring ≥ 8.0 under low-risk multipliers
+- All 6 tests land in Defer; none in should-run
+- Flakiness Tier High is 0 — the suite is healthy
+- The 60-minute budget is irrelevant because no automated tests qualify for must-run or should-run
+
 Notice how few tests land in must-run. Compare with the high-risk scenario to see the full range of the scoring formula.
 
 ### Context
@@ -111,6 +145,24 @@ iro benchmark benchmarks/degraded-suite-high-flakiness.input.yaml \
               benchmarks/degraded-suite-high-flakiness.assertions.yaml
 # Expected: OK — 19 checks passed.
 ```
+
+### Expected Output
+
+```
+Sprint Risk Level:     medium
+NFR Elevation:         No
+Budget Overflow:       No
+Total Must-Run:        1
+Total Retire Candidates: 3
+Flakiness Tier High:   4 tests above threshold
+Automated time:        5 min  (budget: 15 min)
+```
+
+Key signals to observe:
+- 3 retire candidates — all automated, flakiness 0.38–0.50, no unique coverage
+- `TEST-206 flaky inventory unique check` is flaky (0.25) but has unique coverage → **not** retired, only deferred
+- Only 1 test reaches must-run (score 8.9) despite medium-risk sprint — coverage area matching is strict
+- `TEST-202` lands in should-run at score 6.6, below the 8.0 must-run threshold
 
 Look at the Retire Candidates section in the output. Then open the input file and find which tests pass all three retire conditions: `automated: true`, flakiness above threshold, and no unique coverage.
 
@@ -222,3 +274,41 @@ A sprint where one story depends on another. The dependency story changes areas 
 | Exploratory-Driven | medium | No | Possible | Unlikely | Human judgement amplifies priority |
 | Manual-Heavy | varies | Depends | Possible | Never (manual) | Budget only counts automated tests |
 | Dependency Chain | varies | Depends | Possible | Possible | dep_coverage reveals hidden coupling |
+
+---
+
+## Common Input Mistakes
+
+Schema and input errors that cause silent wrong results or hard-to-read validation failures.
+
+**Wrong risk value**
+```yaml
+# Bad — unrecognised value is a validation error
+risk: HIGH        # must be lowercase: high / medium / low
+```
+
+**Coverage areas not matching changed areas**
+The most common reason a test scores zero when you expect it to be prioritised. `coverage_areas` in the test must exactly match strings in a story's `changed_areas`.
+```yaml
+# Story changed_areas: [PaymentService]
+# Test coverage_areas: [payment_service]  ← no match — test scores 0
+coverage_areas: [PaymentService]           # ← must be identical string
+```
+
+**Dependency story ID not defined in the same sprint**
+```yaml
+stories:
+  - id: story-A
+    dependency_stories: [story-X]  # story-X is not in this sprint — validation error
+```
+
+**Forgetting `automated: true` is the default**
+Tests without an `automated` field are treated as automated. If a test is manual, declare it explicitly; otherwise it counts against the time budget.
+```yaml
+automated: false   # required to exclude from budget and tag as (manual)
+```
+
+**Mixing test layers incorrectly**
+`layer` must be one of: `e2e`, `integration`, `unit`, `security`, `performance`. Any other value is a validation error. NFR elevation only triggers for `performance` and `security` layers — `perf` or `sec` will not be elevated.
+
+For strategic mistakes (running everything, ignoring flakiness, premature retirement), see Section 5 of the [LEARNING-GUIDE](LEARNING-GUIDE.md).
