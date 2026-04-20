@@ -31,6 +31,10 @@ _CANONICAL_MAP: dict[str, str] = {
     "failure_count_last_30d": "Failure Count (30d)",
     "automated":              "Automated",
     "tags":                   "Tags",
+    "priority":               "Priority",
+    "external_id":            "External ID",
+    "owner":                  "Owner",
+    "module":                 "Module",
 }
 
 # All accepted aliases per field (normalised keys)
@@ -46,6 +50,12 @@ _ALIASES: dict[str, list[str]] = {
                                "failures30d", "failures"],
     "automated":              ["automated", "isautomated", "auto"],
     "tags":                   ["tags", "tag", "labels", "label"],
+    "priority":               ["priority", "testpriority", "prio", "severity"],
+    "external_id":            ["externalid", "jiraid", "jira", "testrailid",
+                               "ticketid", "issueid", "extid"],
+    "owner":                  ["owner", "testowner", "assignee", "ownedby", "author"],
+    "module":                 ["module", "component", "testsuite", "suite",
+                               "section", "testsection"],
 }
 
 REQUIRED_FIELDS = {"id", "name", "layer", "coverage_areas", "execution_time_secs", "flakiness_rate"}
@@ -295,6 +305,18 @@ def _parse_row(raw: dict[str, Any], row_idx: int) -> dict[str, Any]:
     # --- tags (optional) ---
     tags = _parse_list(raw.get("tags"))
 
+    # --- priority (optional, passthrough) ---
+    priority_val = str(raw.get("priority", "") or "").strip() or None
+
+    # --- external_id (optional, passthrough) ---
+    external_id_val = str(raw.get("external_id", "") or "").strip() or None
+
+    # --- owner (optional, passthrough) ---
+    owner_val = str(raw.get("owner", "") or "").strip() or None
+
+    # --- module (optional, passthrough) ---
+    module_val = str(raw.get("module", "") or "").strip() or None
+
     return {
         "id": id_val,
         "name": name_val,
@@ -305,4 +327,8 @@ def _parse_row(raw: dict[str, Any], row_idx: int) -> dict[str, Any]:
         "failure_count_last_30d": failure_count,
         "automated": automated,
         "tags": tags,
+        "priority": priority_val,
+        "external_id": external_id_val,
+        "owner": owner_val,
+        "module": module_val,
     }
