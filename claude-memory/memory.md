@@ -9,8 +9,8 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: repo scaffolded. Product definition and MVP scope not yet written.
-- This is the second business-capability repository in the broader Agentic Upskilling program.
+- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter spike COMPLETE. Phase 2 documentation next.
+- Active branch: `phase-3-excel-adapter` (HEAD: ebf1a7a). Branch `phase-1-deterministic-core` is the Phase 1 baseline.
 
 ## Decisions Made
 
@@ -102,10 +102,13 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Phase 1 MVP (T1-T12) COMPLETE. Committed on branch `phase-1-deterministic-core`.
-- Review fixes applied: temp-path compliance, input validation, retire-candidate flakiness display.
-- 166 tests passing, 99.10% coverage.
-- Next: Phase 2 documentation and learning tutorials (D1-D9 in plan.md).
+- Phase 3 Excel adapter spike (A1-A3, A5-A6) COMPLETE on `phase-3-excel-adapter`. Commit `ebf1a7a`.
+  - `excel_loader.py`: strict validation (blank required cells raise, malformed typed optional cells raise), multi-sheet, fuzzy header matching, 4 passthrough columns (priority, external_id, owner, module).
+  - `iro import-tests`: emits `test_suite:` block only; merge with sprint YAML manually before `iro run`.
+  - `templates/test_suite_template.xlsx`: 13 columns, 5 example rows.
+  - `benchmarks/sample-import.xlsx`: 7 rows, 13 columns — A6 artifact.
+  - 228 tests, all green. GPT-5.4 review findings addressed.
+- Next: Phase 2 documentation (D1-D9) — create `phase-2-docs` branch from `phase-3-excel-adapter`.
 
 ## Blockers
 - None.
@@ -123,5 +126,10 @@ Required labels (7, section-aware):
 - T10: end_to_end_flow.py + benchmark_runner.py (11 tests)
 - T11: cli.py with `iro run` and `iro benchmark` subcommands (14 tests)
 - T12: Coverage hardening — all modules >=90%, total 99.10% (166 tests)
-- Review fixes: temp-path compliance (repo_tmp fixture), input validation (name required, list-type checks), retire display (actual flakiness_rate)
+- Review fixes (Phase 1): temp-path compliance (repo_tmp fixture), input validation (name required, list-type checks), retire display (actual flakiness_rate)
+- A1: `templates/test_suite_template.xlsx` — 13 columns, 5 example rows
+- A2: `excel_loader.py` — strict required/optional validation, fuzzy headers, multi-sheet, passthrough columns
+- A3: `iro import-tests` CLI subcommand — emits test_suite section only
+- A5: Row+column validation for all required and typed optional cells
+- A6: `benchmarks/sample-import.xlsx` + 62 Excel-related tests; 228 total
 
