@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intelligent-regression-optimizer"
+version = "0.1.0"
+description = "Deterministic regression suite optimizer for sprint-scoped delivery"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "AGPL-3.0-or-later"}
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+iro = "intelligent_regression_optimizer.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["intelligent_regression_optimizer"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
