@@ -48,15 +48,15 @@ class TestImportTestsStdout:
         result = runner.invoke(main, ["import-tests", str(TEMPLATES / "test_suite_template.xlsx")])
         assert "test_suite:" in result.output
 
-    def test_output_contains_sprint_context_stub(self):
+    def test_output_does_not_contain_sprint_context_stub(self):
         runner = CliRunner()
         result = runner.invoke(main, ["import-tests", str(TEMPLATES / "test_suite_template.xlsx")])
-        assert "sprint_context:" in result.output
+        assert "sprint_context:" not in result.output
 
-    def test_output_contains_constraints_stub(self):
+    def test_output_does_not_contain_constraints_stub(self):
         runner = CliRunner()
         result = runner.invoke(main, ["import-tests", str(TEMPLATES / "test_suite_template.xlsx")])
-        assert "constraints:" in result.output
+        assert "constraints:" not in result.output
 
     def test_output_is_valid_yaml(self):
         runner = CliRunner()

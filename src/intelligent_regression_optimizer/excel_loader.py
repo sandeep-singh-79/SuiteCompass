@@ -10,7 +10,6 @@ import re
 from typing import Any
 
 import openpyxl
-from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -259,16 +258,26 @@ def _parse_row(raw: dict[str, Any], row_idx: int) -> dict[str, Any]:
             f"Must be one of: {sorted(VALID_LAYERS)}"
         )
 
-    # --- coverage_areas ---
-    coverage_areas = _parse_list(raw.get("coverage_areas"))
+    # --- coverage_areas (required) ---
+    raw_cov = raw.get("coverage_areas")
+    if raw_cov is None or str(raw_cov).strip() == "":
+        raise ExcelLoaderError(
+            f"Row {row_idx}, column 'Coverage Areas': value is empty. Coverage Areas is required."
+        )
+    coverage_areas = _parse_list(raw_cov)
 
-    # --- execution_time_secs ---
+    # --- execution_time_secs (required) ---
+    raw_exec = raw.get("execution_time_secs")
+    if raw_exec is None or str(raw_exec).strip() == "":
+        raise ExcelLoaderError(
+            f"Row {row_idx}, column 'Execution Time (secs)': value is empty. Execution Time is required."
+        )
     try:
-        exec_time = float(raw.get("execution_time_secs") or 0)
+        exec_time = float(raw_exec)
     except (TypeError, ValueError):
         raise ExcelLoaderError(
             f"Row {row_idx}, column 'Execution Time (secs)': "
-            f"value {raw.get('execution_time_secs')!r} must be a number."
+            f"value {raw_exec!r} must be a number."
         )
     if exec_time < 0:
         raise ExcelLoaderError(
@@ -276,13 +285,18 @@ def _parse_row(raw: dict[str, Any], row_idx: int) -> dict[str, Any]:
             f"value {exec_time} must be non-negative."
         )
 
-    # --- flakiness_rate ---
+    # --- flakiness_rate (required) ---
+    raw_flak = raw.get("flakiness_rate")
+    if raw_flak is None or str(raw_flak).strip() == "":
+        raise ExcelLoaderError(
+            f"Row {row_idx}, column 'Flakiness Rate': value is empty. Flakiness Rate is required."
+        )
     try:
-        flakiness = float(raw.get("flakiness_rate") or 0)
+        flakiness = float(raw_flak)
     except (TypeError, ValueError):
         raise ExcelLoaderError(
             f"Row {row_idx}, column 'Flakiness Rate': "
-            f"value {raw.get('flakiness_rate')!r} must be a number."
+            f"value {raw_flak!r} must be a number."
         )
     if not 0.0 <= flakiness <= 1.0:
         raise ExcelLoaderError(
@@ -291,16 +305,30 @@ def _parse_row(raw: dict[str, Any], row_idx: int) -> dict[str, Any]:
         )
 
     # --- failure_count_last_30d (optional) ---
-    try:
-        failure_count = int(raw.get("failure_count_last_30d") or 0)
-    except (TypeError, ValueError):
+    raw_fc = raw.get("failure_count_last_30d")
+    if raw_fc is None or str(raw_fc).strip() == "":
         failure_count = 0
+    else:
+        try:
+            failure_count = int(raw_fc)
+        except (TypeError, ValueError):
+            raise ExcelLoaderError(
+                f"Row {row_idx}, column 'Failure Count (30d)': "
+                f"value {raw_fc!r} must be an integer."
+            )
 
     # --- automated (optional) ---
-    try:
-        automated = _parse_bool(raw.get("automated", True))
-    except ValueError:
+    raw_auto = raw.get("automated")
+    if raw_auto is None or str(raw_auto).strip() == "":
         automated = True
+    else:
+        try:
+            automated = _parse_bool(raw_auto)
+        except ValueError:
+            raise ExcelLoaderError(
+                f"Row {row_idx}, column 'Automated': "
+                f"value {raw_auto!r} is not valid. Use: true/false/yes/no/1/0."
+            )
 
     # --- tags (optional) ---
     tags = _parse_list(raw.get("tags"))

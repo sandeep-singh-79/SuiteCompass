@@ -343,11 +343,12 @@ class TestParseBoolBranches:
         tests = load_excel(str(p))
         assert tests[0]["automated"] is False
 
-    def test_unrecognised_automated_value_defaults_to_true(self):
+    def test_unrecognised_automated_value_raises(self):
+        """Malformed Automated value 'maybe' must raise, not silently default to True."""
         wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, 0, "maybe", ""]])
         p = _save_tmp(wb, "auto_maybe.xlsx")
-        tests = load_excel(str(p))
-        assert tests[0]["automated"] is True
+        with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Aa]utomated"):
+            load_excel(str(p))
 
     def test_non_numeric_execution_time_raises(self):
         wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", "fast", 0.0, 0, "true", ""]])
@@ -365,6 +366,34 @@ class TestParseBoolBranches:
         wb = _make_wb(rows=[["T-01", "", "unit", "ServiceA", 10, 0.0, 0, "true", ""]])
         p = _save_tmp(wb, "empty_name.xlsx")
         with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Nn]ame"):
+            load_excel(str(p))
+
+    def test_blank_coverage_areas_raises(self):
+        """Blank required Coverage Areas must raise, not silently produce empty list."""
+        wb = _make_wb(rows=[["T-01", "test", "unit", "", 10, 0.0, 0, "true", ""]])
+        p = _save_tmp(wb, "blank_coverage.xlsx")
+        with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Cc]overage"):
+            load_excel(str(p))
+
+    def test_blank_execution_time_raises(self):
+        """Blank required Execution Time must raise, not silently produce 0.0."""
+        wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", None, 0.0, 0, "true", ""]])
+        p = _save_tmp(wb, "blank_exec_time.xlsx")
+        with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Ee]xecution"):
+            load_excel(str(p))
+
+    def test_blank_flakiness_rate_raises(self):
+        """Blank required Flakiness Rate must raise, not silently produce 0.0."""
+        wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", 10, None, 0, "true", ""]])
+        p = _save_tmp(wb, "blank_flakiness.xlsx")
+        with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Ff]lakiness"):
+            load_excel(str(p))
+
+    def test_malformed_failure_count_raises(self):
+        """Non-integer Failure Count must raise, not silently produce 0."""
+        wb = _make_wb(rows=[["T-01", "test", "unit", "ServiceA", 10, 0.0, "many", "true", ""]])
+        p = _save_tmp(wb, "bad_failure_count.xlsx")
+        with pytest.raises(ExcelLoaderError, match="[Rr]ow 2|[Ff]ailure"):
             load_excel(str(p))
 
 

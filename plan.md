@@ -125,12 +125,12 @@ Enable teams to feed their existing test inventory from spreadsheets instead of 
 
 | Track | Goal | Status | Notes |
 |---|---|---|---|
-| A1 - Excel Template | Sample .xlsx with correct column headers + example rows | Not Started | Ships with repo under templates/ |
-| A2 - Excel Loader | `excel_loader.py` — reads .xlsx, maps columns to test_suite schema, outputs YAML | Not Started | openpyxl dependency |
-| A3 - CLI `import-tests` | `iro import-tests tests.xlsx --output test_suite.yaml` subcommand | Not Started | Generates test_suite section only |
-| A4 - Merge Utility | `iro run --tests test_suite.yaml --sprint sprint.yaml` or auto-merge | Not Started | Optional convenience; manual merge is fallback |
-| A5 - Validation | Validate Excel columns, report missing/invalid data with row numbers | Not Started | Same rigour as YAML input validation |
-| A6 - Tests + Benchmarks | >=15 tests; sample .xlsx in benchmarks/ | Not Started | TDD: red, green, refactor |
+| A1 - Excel Template | Sample .xlsx with correct column headers + example rows | Complete | `templates/test_suite_template.xlsx` — 13 columns, 5 example rows |
+| A2 - Excel Loader | `excel_loader.py` — reads .xlsx, maps columns to test_suite schema, outputs YAML | Complete | Strict validation: blank required cells raise; malformed optional cells raise |
+| A3 - CLI `import-tests` | `iro import-tests tests.xlsx --output test_suite.yaml` subcommand | Complete | Emits test_suite section only; merge with sprint YAML manually |
+| A4 - Merge Utility | `iro run --tests test_suite.yaml --sprint sprint.yaml` or auto-merge | Not Scoped | Optional convenience; manual merge is fallback for spike |
+| A5 - Validation | Validate Excel columns, report missing/invalid data with row numbers | Complete | Blank required cells raise; malformed typed optional cells raise |
+| A6 - Tests + Benchmarks | >=15 tests; sample .xlsx in benchmarks/ | Complete | 229+ tests; `benchmarks/sample-import.xlsx` added |
 
 ### Column Mapping (default)
 
@@ -142,9 +142,13 @@ Enable teams to feed their existing test inventory from spreadsheets instead of 
 | Coverage Areas | coverage_areas | Yes | Comma-separated |
 | Execution Time (secs) | execution_time_secs | Yes | Numeric |
 | Flakiness Rate | flakiness_rate | Yes | 0.0 – 1.0 |
-| Failure Count (30d) | failure_count_last_30d | No | Default 0 |
-| Automated | automated | No | Default true |
+| Failure Count (30d) | failure_count_last_30d | No | Default 0; malformed values raise |
+| Automated | automated | No | Default true; malformed values raise |
 | Tags | tags | No | Comma-separated |
+| Priority | priority | No | Passthrough — P0/P1/P2/P3; not used in scoring |
+| External ID | external_id | No | Passthrough — Jira/TestRail ref; fuzzy aliases: jira, testrailid |
+| Owner | owner | No | Passthrough — assignee or team name |
+| Module | module | No | Passthrough — component/suite; fuzzy aliases: component, suite, section |
 
 ### Adapter Acceptance Criteria
 
