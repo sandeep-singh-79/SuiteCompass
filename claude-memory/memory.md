@@ -9,8 +9,8 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter spike COMPLETE. Phase 2 documentation next.
-- Active branch: `phase-3-excel-adapter` (HEAD: ebf1a7a). Branch `phase-1-deterministic-core` is the Phase 1 baseline.
+- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter spike COMPLETE. Phase 2 documentation COMPLETE.
+- Active branch: `phase-3-excel-adapter` (HEAD includes all Phase 1 + 3 + 2 work).
 
 ## Decisions Made
 
@@ -102,13 +102,10 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Phase 3 Excel adapter spike (A1-A3, A5-A6) COMPLETE on `phase-3-excel-adapter`. Commit `ebf1a7a`.
-  - `excel_loader.py`: strict validation (blank required cells raise, malformed typed optional cells raise), multi-sheet, fuzzy header matching, 4 passthrough columns (priority, external_id, owner, module).
-  - `iro import-tests`: emits `test_suite:` block only; merge with sprint YAML manually before `iro run`.
-  - `templates/test_suite_template.xlsx`: 13 columns, 5 example rows.
-  - `benchmarks/sample-import.xlsx`: 7 rows, 13 columns — A6 artifact.
-  - 228 tests, all green. GPT-5.4 review findings addressed.
-- Next: Phase 2 documentation (D1-D9) — create `phase-2-docs` branch from `phase-3-excel-adapter`.
+- Phase 2 documentation (D1-D9) COMPLETE on `phase-3-excel-adapter`.
+  - README.md rewritten (project overview, quick-start, CLI reference, doc index)
+  - 8 doc files under `docs/`: V1-INPUT-TEMPLATE, V1-OUTPUT-TEMPLATE, DECISION-RULES, USAGE-GUIDE, SCENARIO-LIBRARY, VALIDATION-HARNESS, LEARNING-GUIDE, PHASED-IMPLEMENTATION
+- Next: merge `phase-3-excel-adapter` → `main`; plan Phase 4+ if needed.
 
 ## Blockers
 - None.
