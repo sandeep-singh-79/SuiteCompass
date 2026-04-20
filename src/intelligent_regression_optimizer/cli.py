@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 import yaml
 
 from .benchmark_runner import run_assertions
-from .end_to_end_flow import run_pipeline
+from .end_to_end_flow import run_pipeline, run_pipeline_from_merged
 from .excel_loader import ExcelLoaderError, load_excel
 from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR
 
@@ -20,11 +21,36 @@ def main() -> None:
 
 
 @main.command()
-@click.argument("input_file", type=click.Path(exists=False))
+@click.argument("input_file", type=click.Path(exists=False), required=False, default=None)
 @click.option("--output", "-o", type=click.Path(), default=None, help="Write report to file instead of stdout.")
-def run(input_file: str, output: str | None) -> None:
-    """Run the optimisation pipeline on INPUT_FILE and print the report."""
-    result = run_pipeline(input_file)
+@click.option("--tests", type=click.Path(), default=None,
+              help="Path to test_suite YAML file (use with --sprint).")
+@click.option("--sprint", type=click.Path(), default=None,
+              help="Path to sprint context YAML file (use with --tests).")
+def run(input_file: str | None, output: str | None, tests: str | None, sprint: str | None) -> None:
+    """Run the optimisation pipeline on INPUT_FILE and print the report.
+
+    Alternatively, use --tests and --sprint to supply the test suite and
+    sprint context as separate files. The tool merges them before running.
+    """
+    # Validate argument combinations
+    if input_file and (tests or sprint):
+        click.echo("Error: cannot combine INPUT_FILE with --tests/--sprint flags.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if not input_file and not (tests and sprint):
+        click.echo("Error: provide either INPUT_FILE or both --tests and --sprint.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if bool(tests) != bool(sprint):
+        click.echo("Error: --tests and --sprint must be used together.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if input_file:
+        result = run_pipeline(input_file)
+    else:
+        # Merge mode
+        result = _run_merged(tests, sprint)  # type: ignore[arg-type]
 
     if result.exit_code == EXIT_INPUT_ERROR:
         click.echo(f"Error: {result.message}", err=True)
@@ -40,6 +66,75 @@ def run(input_file: str, output: str | None) -> None:
         click.echo(result.message)
 
     sys.exit(EXIT_OK)
+
+
+def _run_merged(tests_path: str, sprint_path: str) -> Any:
+    """Load two YAML files, merge them, and run the pipeline."""
+    from .models import FlowResult
+
+    tests_p = Path(tests_path)
+    sprint_p = Path(sprint_path)
+
+    if not tests_p.exists():
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message=f"Tests file not found: {tests_path!r}",
+            output_path=None,
+        )
+    if not sprint_p.exists():
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message=f"Sprint file not found: {sprint_path!r}",
+            output_path=None,
+        )
+
+    with tests_p.open(encoding="utf-8") as fh:
+        tests_data = yaml.safe_load(fh)
+    with sprint_p.open(encoding="utf-8") as fh:
+        sprint_data = yaml.safe_load(fh)
+
+    if not isinstance(tests_data, dict):
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message="Tests file must be a YAML mapping",
+            output_path=None,
+        )
+    if not isinstance(sprint_data, dict):
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message="Sprint file must be a YAML mapping",
+            output_path=None,
+        )
+
+    # Extract test_suite from tests file
+    if "test_suite" not in tests_data:
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message="Tests file must contain a 'test_suite' key",
+            output_path=None,
+        )
+
+    # Extract sprint_context and constraints from sprint file
+    if "sprint_context" not in sprint_data:
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message="Sprint file must contain a 'sprint_context' key",
+            output_path=None,
+        )
+    if "constraints" not in sprint_data:
+        return FlowResult(
+            exit_code=EXIT_INPUT_ERROR,
+            message="Sprint file must contain a 'constraints' key",
+            output_path=None,
+        )
+
+    merged: dict[str, Any] = {
+        "sprint_context": sprint_data["sprint_context"],
+        "test_suite": tests_data["test_suite"],
+        "constraints": sprint_data["constraints"],
+    }
+
+    return run_pipeline_from_merged(merged)
 
 
 @main.command()
