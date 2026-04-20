@@ -35,15 +35,15 @@ class TestRunCommand:
         result = runner.invoke(main, ["run", "nonexistent-file.yaml"])
         assert result.exit_code == 2
 
-    def test_run_invalid_input_exits_2(self, tmp_path):
-        bad = tmp_path / "bad.yaml"
+    def test_run_invalid_input_exits_2(self, repo_tmp):
+        bad = repo_tmp / "bad.yaml"
         bad.write_text("not_a_dict: yes\n")
         runner = CliRunner()
         result = runner.invoke(main, ["run", str(bad)])
         assert result.exit_code == 2
 
-    def test_run_output_flag_writes_file(self, tmp_path):
-        out_file = tmp_path / "report.md"
+    def test_run_output_flag_writes_file(self, repo_tmp):
+        out_file = repo_tmp / "report.md"
         runner = CliRunner()
         result = runner.invoke(
             main,
@@ -79,8 +79,8 @@ class TestBenchmarkCommand:
         )
         assert result.exit_code == 0
 
-    def test_benchmark_failing_assertions_exits_1(self, tmp_path):
-        failing = tmp_path / "fail.assertions.yaml"
+    def test_benchmark_failing_assertions_exits_1(self, repo_tmp):
+        failing = repo_tmp / "fail.assertions.yaml"
         failing.write_text("must_include_substrings:\n  - 'THIS_STRING_WILL_NEVER_APPEAR_XYZZY'\n")
         runner = CliRunner()
         result = runner.invoke(

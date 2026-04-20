@@ -17,7 +17,7 @@ def _fmt_test(st: ScoredTest) -> str:
 
 
 def _fmt_retire(st: ScoredTest) -> str:
-    return f"- {st.test_id} {st.name} (flakiness: {st.raw_score:.2f}, no unique coverage)"
+    return f"- {st.test_id} {st.name} (flakiness: {st.flakiness_rate:.2f}, no unique coverage)"
 
 
 def _count_flakiness_high(normalized: dict[str, Any]) -> int:

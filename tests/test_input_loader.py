@@ -348,3 +348,124 @@ class TestFileErrors:
         """)
         with pytest.raises(InputValidationError, match="S-NONEXISTENT"):
             load_input(str(p))
+
+
+# ---------------------------------------------------------------------------
+# Type validation — collection types must be lists (Critical fix #3)
+# ---------------------------------------------------------------------------
+
+class TestCollectionTypeValidation:
+    """tests must be a list, stories must be a list, mandatory_tags must be a list."""
+
+    def test_test_suite_as_dict_raises(self):
+        p = _write_tmp("test_suite_dict.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite: {}
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="test_suite must be a list"):
+            load_input(str(p))
+
+    def test_test_suite_as_string_raises(self):
+        p = _write_tmp("test_suite_str.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite: not_a_list
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="test_suite must be a list"):
+            load_input(str(p))
+
+    def test_stories_as_dict_raises(self):
+        p = _write_tmp("stories_dict.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: {}
+              exploratory_sessions: []
+            test_suite: []
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="stories must be a list"):
+            load_input(str(p))
+
+    def test_mandatory_tags_as_string_raises(self):
+        p = _write_tmp("mandatory_tags_str.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite: []
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: critical
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="mandatory_tags must be a list"):
+            load_input(str(p))
+
+    def test_dependency_stories_as_string_raises(self):
+        p = _write_tmp("dep_stories_str.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories:
+                - id: S-1
+                  risk: high
+                  changed_areas: [Foo]
+                  dependency_stories: S-2
+              exploratory_sessions: []
+            test_suite: []
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="dependency_stories must be a list"):
+            load_input(str(p))
+
+
+# ---------------------------------------------------------------------------
+# Required field: name (Critical fix #2)
+# ---------------------------------------------------------------------------
+
+class TestMissingNameField:
+    def test_test_missing_name_raises(self):
+        p = _write_tmp("no_name.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite:
+              - id: T1
+                layer: unit
+                coverage_areas: [Foo]
+                execution_time_secs: 10
+                flakiness_rate: 0.01
+                automated: true
+                tags: []
+            constraints:
+              time_budget_mins: 30
+              mandatory_tags: []
+              flakiness_retire_threshold: 0.3
+              flakiness_high_tier_threshold: 0.2
+        """)
+        with pytest.raises(InputValidationError, match="name"):
+            load_input(str(p))

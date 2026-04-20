@@ -16,10 +16,11 @@ from intelligent_regression_optimizer.renderer import render_report
 # ---------------------------------------------------------------------------
 
 def _scored(id_, name="test", score=5.0, tier="should-run", override=False,
-            override_reason=None, is_manual=False):
+            override_reason=None, is_manual=False, flakiness_rate=0.0):
     return ScoredTest(
         test_id=id_, name=name, raw_score=score, tier=tier,
         is_override=override, override_reason=override_reason, is_manual=is_manual,
+        flakiness_rate=flakiness_rate,
     )
 
 
@@ -226,3 +227,26 @@ class TestSuiteHealthSummary:
         tier = _tier_result()
         output = render_report(normalized, classifications, tier)
         assert "NFR Elevation: yes" in output.lower() or "NFR Elevation: Yes" in output
+
+
+# ---------------------------------------------------------------------------
+# Retire-candidate flakiness correctness (Critical fix #4)
+# ---------------------------------------------------------------------------
+
+class TestRetireCandidateFlakiness:
+    def test_retire_candidate_shows_actual_flakiness_not_raw_score(self):
+        """The (flakiness: X.XX) in retire output must be the test's
+        flakiness_rate, not the computed raw_score."""
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        # raw_score=6.15 but flakiness_rate=0.45
+        retire_test = _scored(
+            "T99", name="flaky api smoke", score=6.15, tier="retire",
+            flakiness_rate=0.45,
+        )
+        tier = _tier_result(retire=[retire_test])
+        output = render_report(normalized, classifications, tier)
+        # Must contain actual flakiness
+        assert "(flakiness: 0.45" in output
+        # Must NOT contain the raw_score masquerading as flakiness
+        assert "(flakiness: 6.15" not in output

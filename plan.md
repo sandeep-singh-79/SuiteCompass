@@ -40,8 +40,8 @@
 ## MVP Acceptance Criteria (all PASSED)
 
 1. [x] 3 benchmark assertion files pass via benchmark_runner
-2. [x] All modules >=90% coverage (total 99.07%)
-3. [x] 159 tests passing (target was >=110)
+2. [x] All modules >=90% coverage (total 99.10%)
+3. [x] 166 tests passing (target was >=110)
 4. [x] output_validator.validate_output() passes for every benchmark output
 5. [x] CLI iro run returns exit 0 for valid input, exit 2 for invalid
 6. [x] CLI iro benchmark returns exit 0 for passing assertions, exit 1 for failing
@@ -51,8 +51,8 @@
 ## Final Commit
 
 Branch: phase-1-deterministic-core
-HEAD: 281d27b
-Message: feat: T7-T12 complete -- scoring, renderer, benchmarks, E2E, CLI (159 tests, 99% coverage)
+HEAD: (pending commit)
+Message: fix: address review — temp-path compliance, input validation, retire display (166 tests, 99.1% coverage)
 
 ---
 
