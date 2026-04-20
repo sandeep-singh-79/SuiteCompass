@@ -30,9 +30,17 @@ A sprint containing a high-risk story that modifies critical payment infrastruct
 
 Tight budget forces tradeoffs: the team must acknowledge that some scored must-run tests were demoted. NFR elevation is non-negotiable in high-risk sprints — it protects against latent performance/security regressions when critical code changes.
 
----
+### Try It
 
-## 2. Low-Risk Bugfix Sprint
+A runnable benchmark is provided for this scenario:
+
+```bash
+iro benchmark benchmarks/high-risk-feature-sprint.input.yaml \
+              benchmarks/high-risk-feature-sprint.assertions.yaml
+# Expected: OK — 21 checks passed.
+```
+
+Read `benchmarks/high-risk-feature-sprint.input.yaml` alongside the output to trace how each assertion maps to the scoring logic.
 
 ### Context
 
@@ -59,9 +67,17 @@ A quiet sprint with a single low-risk bugfix story. The test suite is healthy (l
 
 In low-risk sprints, the optimizer correctly recommends running fewer tests. Teams should resist the urge to override this by running everything "just in case" — that defeats the purpose of risk-based prioritisation.
 
----
+### Try It
 
-## 3. Degraded Suite / High Flakiness
+A runnable benchmark is provided for this scenario:
+
+```bash
+iro benchmark benchmarks/low-risk-bugfix-sprint.input.yaml \
+              benchmarks/low-risk-bugfix-sprint.assertions.yaml
+# Expected: OK — 18 checks passed.
+```
+
+Notice how few tests land in must-run. Compare with the high-risk scenario to see the full range of the scoring formula.
 
 ### Context
 
@@ -86,9 +102,17 @@ A test suite with widespread flakiness. Many tests exceed the `flakiness_high_ti
 
 The retire list is a signal, not an order. Teams should verify that retiring these tests doesn't remove safety nets for untested edge cases. The "no unique coverage" check prevents retiring the only test that covers a specific area.
 
----
+### Try It
 
-## 4. Tight Budget Sprint
+A runnable benchmark is provided for this scenario:
+
+```bash
+iro benchmark benchmarks/degraded-suite-high-flakiness.input.yaml \
+              benchmarks/degraded-suite-high-flakiness.assertions.yaml
+# Expected: OK — 19 checks passed.
+```
+
+Look at the Retire Candidates section in the output. Then open the input file and find which tests pass all three retire conditions: `automated: true`, flakiness above threshold, and no unique coverage.
 
 ### Context
 
@@ -112,9 +136,7 @@ A busy sprint with multiple high/medium-risk stories, many tests triggered as mu
 
 Budget overflow means the team is making a calculated risk tradeoff. The demoted tests still have non-trivial scores (≥ 8.0) — they're relevant but not the *most* relevant. Teams should monitor whether demoted tests catch regressions in overnight runs.
 
----
-
-## 5. Exploratory-Driven Sprint
+> **No runnable benchmark** — this is an illustrative scenario. Create your own by writing an input with many high-scoring tests and a tight budget.
 
 ### Context
 
@@ -138,9 +160,7 @@ Exploratory testing has identified specific risk areas that the test suite shoul
 
 Exploratory sessions encode human judgement about emerging risks. The +3 amplification is deliberate — it allows tester observations to influence automated prioritisation without overriding the entire formula.
 
----
-
-## 6. Manual-Heavy Suite
+> **No runnable benchmark** — this is an illustrative scenario. See Exercise 4 in the [LEARNING-GUIDE](LEARNING-GUIDE.md) for a hands-on walkthrough.
 
 ### Context
 
@@ -164,9 +184,7 @@ A mixed suite where many tests are manual (automation pending). The team needs v
 
 Manual tests represent team knowledge that hasn't been encoded into automation yet. Showing them in the report ensures teams don't lose visibility into necessary manual verification, while not letting them distort the budget constraint for the automated pipeline.
 
----
-
-## 7. Dependency Chain Sprint
+> **No runnable benchmark** — this is an illustrative scenario. Add `automated: false` to any test in an existing benchmark file to observe the behaviour.
 
 ### Context
 
@@ -188,6 +206,8 @@ A sprint where one story depends on another. The dependency story changes areas 
 ### Tradeoffs
 
 1-hop dependency traversal catches the most common coupling case (Story A depends on Story B; Story B's changes may break tests not directly related to Story A). Multi-hop traversal is deliberately deferred — it adds complexity without clear value for most sprint shapes.
+
+> **No runnable benchmark** — this is an illustrative scenario. See Exercise 5 in the [LEARNING-GUIDE](LEARNING-GUIDE.md) for a hands-on walkthrough with scoring calculations.
 
 ---
 

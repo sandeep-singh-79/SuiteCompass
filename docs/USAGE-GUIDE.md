@@ -83,17 +83,93 @@ test_suite:
 
 ### Step 3 — Merge with sprint context
 
-Create a separate file with `sprint_context` and `constraints`, then combine:
+Create a separate `sprint.yaml` file with `sprint_context` and `constraints` (see [V1-INPUT-TEMPLATE](V1-INPUT-TEMPLATE.md) for schema).
 
-**Option A:** Manually copy the `test_suite:` block into your sprint YAML.
+Then run with the split-file flags — no manual merge required:
 
-**Option B:** Use a YAML merge tool or script.
+```bash
+iro run --tests test_suite.yaml --sprint sprint.yaml --output report.md
+```
 
-### Step 4 — Run the optimiser
+Alternatively, if you prefer a single combined file:
+
+**Option B (manual):** Copy the `test_suite:` block from `test_suite.yaml` into your sprint YAML and run:
 
 ```bash
 iro run combined.yaml --output report.md
 ```
+
+### Step 4 — Run the optimiser
+
+With split-file mode (recommended):
+
+```bash
+iro run --tests test_suite.yaml --sprint sprint.yaml
+```
+
+With a combined file:
+
+```bash
+iro run combined.yaml --output report.md
+```
+
+---
+
+## Workflow 3: Split-File Mode
+
+For teams that keep test inventories and sprint context in separate files permanently. No merging required.
+
+### When to use
+
+- You use `iro import-tests` to produce `test_suite.yaml` from Excel
+- Your sprint context lives in a separate `sprint.yaml` file
+- You don't want to maintain a combined file
+
+### How it works
+
+```bash
+# Step 1 — Import tests from Excel (or maintain test_suite.yaml manually)
+iro import-tests tests.xlsx --output test_suite.yaml
+
+# Step 2 — Maintain sprint_context + constraints in a sprint file
+# sprint.yaml contains: sprint_context, constraints (NOT test_suite)
+
+# Step 3 — Run using both files
+iro run --tests test_suite.yaml --sprint sprint.yaml
+```
+
+### sprint.yaml structure for split-file mode
+
+```yaml
+sprint_context:
+  sprint_id: SPRINT-42
+  stories:
+    - id: PROJ-1100
+      title: Add retry logic
+      risk: high
+      type: feature
+      changed_areas:
+        - PaymentService
+      dependency_stories: []
+  exploratory_sessions: []
+
+constraints:
+  time_budget_mins: 20
+  mandatory_tags:
+    - critical-flow
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20
+```
+
+Note: `sprint.yaml` must contain `sprint_context` and `constraints` but does **not** contain `test_suite`.
+
+### Validation rules for split-file mode
+
+- `--tests` and `--sprint` must always be used together
+- `--tests` file must contain a `test_suite` key
+- `--sprint` file must contain both `sprint_context` and `constraints` keys
+- Cannot combine `INPUT_FILE` argument with `--tests`/`--sprint` flags
+- Full schema validation (required fields, types, value ranges) applies to the merged data
 
 ---
 
@@ -102,13 +178,26 @@ iro run combined.yaml --output report.md
 ### `iro run`
 
 ```
-Usage: iro run [OPTIONS] INPUT_FILE
+Usage: iro run [OPTIONS] [INPUT_FILE]
+       iro run --tests TESTS_FILE --sprint SPRINT_FILE [OPTIONS]
 ```
 
 Run the optimisation pipeline on INPUT_FILE and print the report.
 
+Alternatively, supply a test suite and sprint context as separate files using `--tests` and `--sprint`.
+
+**Single-file mode:**
+
 | Option | Description |
 |---|---|
+| `--output, -o <path>` | Write report to file instead of stdout |
+
+**Split-file mode (`--tests` + `--sprint`):**
+
+| Option | Description |
+|---|---|
+| `--tests <path>` | Path to YAML file containing the `test_suite` block |
+| `--sprint <path>` | Path to YAML file containing `sprint_context` and `constraints` |
 | `--output, -o <path>` | Write report to file instead of stdout |
 
 | Exit Code | Meaning |

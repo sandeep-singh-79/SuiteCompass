@@ -176,6 +176,31 @@ Given the valid input from `tests/fixtures/valid_input.yaml`:
 
 **Expected:** Without `risk: high`, NFR elevation deactivates. TEST-003 loses its override but may still score via direct coverage. It likely drops from must-run to should-run or defer.
 
+<details>
+<summary><strong>Worked Solution</strong></summary>
+
+With `risk: high` (original): TEST-003 scores as:
+```
+direct_coverage=1 (PaymentService ∩ PROJ-1100), risk_mult=1.0   → 10 × 1 × 1.0  = 10.0
+dep_coverage=1    (PaymentService ∩ PROJ-1099), dep_risk_mult=0.3 →  5 × 1 × 0.3  =  1.5
+exploratory_match=1 (PaymentService ∈ EX-07)                    →  3 × 1         =  3.0
+flakiness penalty (0.01)                                        → -8 × 0.01      = -0.08
+raw_score = 14.42  → must-run  +  [override: nfr-elevation]
+```
+
+After changing `PROJ-1100` risk to `low`:
+```
+direct_coverage=1, risk_mult=0.3    → 10 × 1 × 0.3  = 3.0
+dep_coverage=1,    dep_risk_mult=0.15 →  5 × 1 × 0.15 = 0.75
+exploratory_match=1                →  3 × 1         = 3.0
+flakiness penalty                  → -8 × 0.01      = -0.08
+raw_score = 6.67  → should-run  (≥4 but <8; NFR elevation off because sprint_risk_level is now low)
+```
+
+Key takeaway: the risk multiplier has a 3.3× swing between `high` (1.0) and `low` (0.3). NFR elevation is an all-or-nothing trigger on `sprint_risk_level == high` — changing any story's risk to low affects the whole sprint.
+
+</details>
+
 ### Exercise 2: Create a Retire Candidate
 
 1. Copy `tests/fixtures/valid_input.yaml` to a new file
@@ -184,6 +209,27 @@ Given the valid input from `tests/fixtures/valid_input.yaml`:
 4. Run `iro run` and check the Retire Candidates section
 
 **Expected:** Yes — automated, flakiness > 0.30 (threshold), and no unique coverage.
+
+<details>
+<summary><strong>Worked Solution</strong></summary>
+
+Three retire conditions must ALL be true:
+
+1. `automated: true` (default) ✓
+2. `flakiness_rate: 0.45` > `flakiness_retire_threshold: 0.30` ✓
+3. No unique coverage: the new test covers only `PaymentService`, which is also covered by TEST-001
+   → PaymentService is not unique to this test ✓
+
+All three conditions met → retire candidate.
+
+The output line will look like:
+```
+- TEST-NEW your-test-name (flakiness: 0.45, no unique coverage)
+```
+
+Now try changing `coverage_areas` to a new area not covered by any other test (e.g. `[LegacyAdapter]`). The test is still flaky, but it now has **unique coverage** → no longer a retire candidate. The tool will not flag it for retirement, because retiring it would leave `LegacyAdapter` completely uncovered.
+
+</details>
 
 ### Exercise 3: Budget Overflow
 
@@ -194,6 +240,32 @@ Given the valid input from `tests/fixtures/valid_input.yaml`:
 
 **Expected:** Budget Overflow: Yes. The must-run test with the lowest raw_score is demoted to should-run. Override tests (mandatory-tag, NFR elevation) are exempt from demotion.
 
+<details>
+<summary><strong>Worked Solution</strong></summary>
+
+Budget = 2 mins × 60 = 120 seconds.
+
+The three must-run tests and their execution times:
+
+| Test | Score | Time (s) | Override? |
+|------|-------|----------|-----------|
+| TEST-001 (payment flow e2e) | 14.10 | 120 | No |
+| TEST-002 (retry handler) | 12.84 | 45 | Yes (mandatory-tag: critical-flow) |
+| TEST-003 (security) | 14.42 | 90 | Yes (nfr-elevation) |
+
+Override tests are **budget-exempt**, so only TEST-001 counts: 120s.
+Budget is 120s. 120 ≤ 120 → no overflow in this specific case.
+
+Try reducing `time_budget_mins` to 1 (60 seconds). Now TEST-001 (120s) exceeds budget alone:
+
+- TEST-001 has no override and is the only scored must-run test
+- It gets demoted to should-run
+- `Budget Overflow: Yes` appears in the report
+
+This shows that override tests (mandatory-tag, NFR elevation) are never demoted regardless of budget pressure — they represent non-negotiable quality gates.
+
+</details>
+
 ### Exercise 4: Exploratory Session Impact
 
 1. Copy `tests/fixtures/valid_input.yaml`
@@ -202,6 +274,25 @@ Given the valid input from `tests/fixtures/valid_input.yaml`:
 4. Add back the exploratory session and compare
 
 **Expected:** Tests matching the exploratory session's `risk_areas` lose the +3 bonus. Some tests may drop a tier.
+
+<details>
+<summary><strong>Worked Solution</strong></summary>
+
+The exploratory session in `valid_input.yaml` flags `risk_areas: [RetryHandler, PaymentService]`.
+
+Score impact of removing it (the `+3 × exploratory_match` term becomes 0):
+
+| Test | With exploratory | Without | Tier change? |
+|------|-----------------|---------|--------------|
+| TEST-001 (covers PaymentService) | 14.10 | 11.10 | No — still must-run (≥8) |
+| TEST-002 (covers RetryHandler) | 12.84 | 9.84 | No — still must-run (≥8) |
+| TEST-003 (covers PaymentService) | 14.42 | 11.42 | No — still must-run (≥8) |
+
+In this specific input, all tests remain above the must-run threshold even without the bonus. To see a tier change, try a scenario where a test's score sits between 5 and 8 without the bonus — the +3 would push it from should-run to must-run.
+
+The +3 bonus models human judgement: a tester who observed real risk in an area has higher signal than the automated coverage calculation alone.
+
+</details>
 
 ### Exercise 5: Dependency Chain Discovery
 
@@ -212,3 +303,28 @@ Given the valid input from `tests/fixtures/valid_input.yaml`:
 5. Run and verify
 
 **Expected:** Yes — the test scores via `dep_coverage` because Story B (a dependency of Story A) changes `AreaX`.
+
+<details>
+<summary><strong>Worked Solution</strong></summary>
+
+Setup:
+- Story A: `risk: high`, `changed_areas: [AreaY]`, `dependency_stories: [story-b]`
+- Story B: `risk: medium`, `changed_areas: [AreaX]`
+- Test: `coverage_areas: [AreaX]`, `execution_time_secs: 30`, `flakiness_rate: 0.0`
+
+Scoring:
+```
+direct_coverage=0  (AreaX ∉ Story A's changed_areas)             → 0
+dep_coverage=1     (AreaX ∈ Story B's changed_areas)
+dep_risk_mult = Story B risk_mult × 0.5 = 0.6 × 0.5 = 0.3       → 5 × 1 × 0.3 = 1.5
+exploratory_match=0 (no exploratory sessions)                    → 0
+flakiness_penalty (0.0)                                          → 0
+raw_score = 1.5  → defer tier (<4)
+```
+
+Score is 1.5 — above zero but in the defer tier. To push this to should-run, the dependency story would need `risk: high` (dep_risk_mult = 1.0 × 0.5 = 0.5 → dep contribution = 2.5) plus an exploratory match (+3 → total = 5.5, just above the should-run threshold of 4.0).
+
+Key insight: dependency traversal is a **signal amplifier**, not a tier guarantee. A test that only reaches a story via a low-risk dependency will correctly land in defer. High-risk dependencies give meaningful score contributions.
+
+</details>
+
