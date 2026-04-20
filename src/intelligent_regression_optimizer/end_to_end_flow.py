@@ -4,6 +4,8 @@ Wires: load_input → classify_context → score_tests → render_report → val
 """
 from __future__ import annotations
 
+from typing import Any
+
 from intelligent_regression_optimizer.models import (
     EXIT_INPUT_ERROR,
     EXIT_OK,
@@ -26,10 +28,6 @@ def run_pipeline(input_path: str) -> FlowResult:
         InputValidationError,
         load_input,
     )
-    from intelligent_regression_optimizer.context_classifier import classify_context
-    from intelligent_regression_optimizer.scoring_engine import score_tests
-    from intelligent_regression_optimizer.renderer import render_report
-    from intelligent_regression_optimizer.output_validator import validate_output
 
     # 1. Load and validate input
     try:
@@ -39,16 +37,52 @@ def run_pipeline(input_path: str) -> FlowResult:
     except InputValidationError as exc:
         return FlowResult(exit_code=EXIT_INPUT_ERROR, message=str(exc), output_path=None)
 
-    # 2. Classify context
-    classifications = classify_context(package.normalized)
+    return _run_from_package(package.normalized)
 
-    # 3. Score tests
-    tier_result = score_tests(package.normalized, classifications)
 
-    # 4. Render report
-    markdown = render_report(package.normalized, classifications, tier_result)
+def run_pipeline_from_merged(data: dict[str, Any]) -> FlowResult:
+    """Run the pipeline on an already-merged and validated input dict.
 
-    # 5. Validate output contract
+    Used by the CLI merge utility when sprint context and test suite are
+    supplied as separate files.
+
+    Args:
+        data: A dict containing sprint_context, test_suite, and constraints.
+
+    Returns:
+        :class:`FlowResult` with exit_code and the rendered markdown in
+        ``message`` (or an error description on failure).
+    """
+    from intelligent_regression_optimizer.input_loader import (
+        InputValidationError,
+        validate_raw,
+    )
+
+    try:
+        normalized = validate_raw(data)
+    except InputValidationError as exc:
+        return FlowResult(exit_code=EXIT_INPUT_ERROR, message=str(exc), output_path=None)
+
+    return _run_from_package(normalized)
+
+
+def _run_from_package(normalized: dict[str, Any]) -> FlowResult:
+    """Shared pipeline logic: classify → score → render → validate."""
+    from intelligent_regression_optimizer.context_classifier import classify_context
+    from intelligent_regression_optimizer.scoring_engine import score_tests
+    from intelligent_regression_optimizer.renderer import render_report
+    from intelligent_regression_optimizer.output_validator import validate_output
+
+    # Classify context
+    classifications = classify_context(normalized)
+
+    # Score tests
+    tier_result = score_tests(normalized, classifications)
+
+    # Render report
+    markdown = render_report(normalized, classifications, tier_result)
+
+    # Validate output contract
     validation = validate_output(markdown)
     if not validation.is_valid:
         return FlowResult(

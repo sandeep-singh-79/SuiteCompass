@@ -83,26 +83,21 @@ def _resolve_deps(stories: list[dict]) -> list[dict]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def load_input(path: str) -> InputPackage:
-    """Load, parse, and validate an input YAML file.
+def validate_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """Validate a raw input dict and return normalised data.
+
+    This is the shared validation logic used by both :func:`load_input`
+    (file-based) and the merge utility (dict-based).
 
     Args:
-        path: Absolute or relative path to the input YAML.
+        raw: Top-level dict with sprint_context, test_suite, constraints.
 
     Returns:
-        :class:`InputPackage` with ``raw`` and ``normalized`` data.
+        Normalised dict ready for the pipeline.
 
     Raises:
         :class:`InputValidationError` for structural or semantic errors.
-        :class:`FileNotFoundError` if the file does not exist.
     """
-    p = pathlib.Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Input file not found: {path!r}")
-
-    with p.open(encoding="utf-8") as fh:
-        raw: dict[str, Any] = yaml.safe_load(fh)
-
     if not isinstance(raw, dict):
         raise InputValidationError("Input YAML must be a mapping at the top level")
 
@@ -150,5 +145,30 @@ def load_input(path: str) -> InputPackage:
             "exploratory_sessions": sprint.get("exploratory_sessions", []),
         },
     }
+
+    return normalized
+
+
+def load_input(path: str) -> InputPackage:
+    """Load, parse, and validate an input YAML file.
+
+    Args:
+        path: Absolute or relative path to the input YAML.
+
+    Returns:
+        :class:`InputPackage` with ``raw`` and ``normalized`` data.
+
+    Raises:
+        :class:`InputValidationError` for structural or semantic errors.
+        :class:`FileNotFoundError` if the file does not exist.
+    """
+    p = pathlib.Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Input file not found: {path!r}")
+
+    with p.open(encoding="utf-8") as fh:
+        raw: dict[str, Any] = yaml.safe_load(fh)
+
+    normalized = validate_raw(raw)
 
     return InputPackage(source_path=path, raw=raw, normalized=normalized)

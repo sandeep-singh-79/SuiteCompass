@@ -9,8 +9,8 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter spike COMPLETE. Phase 2 documentation COMPLETE.
-- Active branch: `phase-3-excel-adapter` (HEAD includes all Phase 1 + 3 + 2 work).
+- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter (all tracks A1-A6) COMPLETE. Phase 2 documentation COMPLETE.
+- Active branch: `phase-3-merge-utility` (HEAD includes A4 merge utility).
 
 ## Decisions Made
 
@@ -102,10 +102,12 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Phase 2 documentation (D1-D9) COMPLETE on `phase-3-excel-adapter`.
-  - README.md rewritten (project overview, quick-start, CLI reference, doc index)
-  - 8 doc files under `docs/`: V1-INPUT-TEMPLATE, V1-OUTPUT-TEMPLATE, DECISION-RULES, USAGE-GUIDE, SCENARIO-LIBRARY, VALIDATION-HARNESS, LEARNING-GUIDE, PHASED-IMPLEMENTATION
-- Next: merge `phase-3-excel-adapter` → `main`; plan Phase 4+ if needed.
+- Phase 3 A4 merge utility COMPLETE on `phase-3-merge-utility`.
+  - `iro run --tests <file> --sprint <file>` merges two YAML files and runs the pipeline.
+  - `run_pipeline_from_merged()` added to end_to_end_flow.py; `validate_raw()` extracted from input_loader.py.
+  - 17 dedicated tests in `tests/test_cli_merge.py`.
+- All Phase 3 adapter tracks (A1–A6) now COMPLETE.
+- Next: merge `phase-3-merge-utility` → `master`; plan Phase 4+ if needed.
 
 ## Blockers
 - None.
@@ -128,5 +130,6 @@ Required labels (7, section-aware):
 - A2: `excel_loader.py` — strict required/optional validation, fuzzy headers, multi-sheet, passthrough columns
 - A3: `iro import-tests` CLI subcommand — emits test_suite section only
 - A5: Row+column validation for all required and typed optional cells
-- A6: `benchmarks/sample-import.xlsx` + 62 Excel-related tests; 228 total
+- A6: `benchmarks/sample-import.xlsx` + 62 Excel-related tests + 17 merge tests; 245 total
+- A4: `iro run --tests <file> --sprint <file>` merge mode; `validate_raw()` extracted for reuse
 

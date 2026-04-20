@@ -18,12 +18,11 @@ In-progress analysis, temporary notes, open questions, and working context for t
 - LLM narrative layer deferred until deterministic pipeline is proven on all 3 benchmarks.
 - Story `type`-based scoring deferred to Phase 2+.
 - Multi-hop dependency traversal deferred to Phase 2.
-- A4 (Merge Utility: `iro run --tests --sprint`) not scoped for spike; manual merge is fallback.
 
 ## Working Notes
-- CLI entry point: `iro` via pyproject.toml scripts. Subcommands: `run <input.yaml>`, `benchmark <assertions.yaml>`, `import-tests <file.xlsx>`.
+- CLI entry point: `iro` via pyproject.toml scripts. Subcommands: `run <input.yaml>`, `run --tests <t.yaml> --sprint <s.yaml>`, `benchmark <input.yaml> <assertions.yaml>`, `import-tests <file.xlsx>`.
 - Package name: `intelligent_regression_optimizer` (underscore). Tool name: `iro` (short).
 - `tests/.tmp/` is gitignored; `repo_tmp` fixture creates per-test subdirectories there. Never OS tempdir.
-- `import-tests` emits `test_suite:` block only. User must merge with sprint YAML manually before `iro run`.
+- `import-tests` emits `test_suite:` block only. User can merge with sprint YAML manually OR use `iro run --tests --sprint`.
 - Passthrough columns (priority, external_id, owner, module) are carried to YAML output but ignored by the scoring engine.
 

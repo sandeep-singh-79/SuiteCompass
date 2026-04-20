@@ -11,9 +11,9 @@
 | Field | Value |
 |---|---|
 | Capability | intelligent-regression-optimizer |
-| Objective | Phase 2 Documentation COMPLETE |
-| Current Phase | Phase 1 + Phase 3 + Phase 2 all Done |
-| Current Focus | Review + merge to main |
+| Objective | Phase 3 A4 Merge Utility COMPLETE |
+| Current Phase | Phase 1 + Phase 3 (all tracks) + Phase 2 all Done |
+| Current Focus | Commit and merge to master |
 | Last Updated | 2026-04-20 |
 
 ---
@@ -148,9 +148,9 @@ Enable teams to feed their existing test inventory from spreadsheets instead of 
 | A1 - Excel Template | Sample .xlsx with correct column headers + example rows | Complete | `templates/test_suite_template.xlsx` — 13 columns, 5 example rows |
 | A2 - Excel Loader | `excel_loader.py` — reads .xlsx, maps columns to test_suite schema, outputs YAML | Complete | Strict validation: blank required cells raise; malformed optional cells raise |
 | A3 - CLI `import-tests` | `iro import-tests tests.xlsx --output test_suite.yaml` subcommand | Complete | Emits test_suite section only; merge with sprint YAML manually |
-| A4 - Merge Utility | `iro run --tests test_suite.yaml --sprint sprint.yaml` or auto-merge | Not Scoped | Optional convenience; manual merge is fallback for spike |
+| A4 - Merge Utility | `iro run --tests test_suite.yaml --sprint sprint.yaml` or auto-merge | Complete | CLI `run` accepts --tests + --sprint flags; merges and validates before pipeline |
 | A5 - Validation | Validate Excel columns, report missing/invalid data with row numbers | Complete | Blank required cells raise; malformed typed optional cells raise |
-| A6 - Tests + Benchmarks | >=15 tests; sample .xlsx in benchmarks/ | Complete | 229+ tests; `benchmarks/sample-import.xlsx` added |
+| A6 - Tests + Benchmarks | >=15 tests; sample .xlsx in benchmarks/ | Complete | 245 tests; `benchmarks/sample-import.xlsx` added |
 
 ### Column Mapping (default)
 
