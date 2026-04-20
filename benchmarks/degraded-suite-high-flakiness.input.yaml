@@ -1,0 +1,115 @@
+# Benchmark: degraded-suite-high-flakiness
+# Medium-risk sprint, but the test suite is severely degraded —
+# many tests are highly flaky with shared coverage (retire candidates).
+# Expected: multiple retire candidates, no flaky test in must-run,
+#           Flakiness Tier High count non-zero, suite health degraded signal.
+
+sprint_context:
+  sprint_id: SPRINT-DEG-01
+  stories:
+    - id: PROJ-3300
+      title: Update checkout flow
+      risk: medium
+      type: feature
+      changed_areas:
+        - CheckoutService
+        - CartService
+      dependency_stories:
+        - PROJ-3301
+    - id: PROJ-3301
+      title: Refactor cart session handling
+      risk: low
+      type: refactor
+      changed_areas:
+        - CartService
+      dependency_stories: []
+  exploratory_sessions:
+    - session_id: EX-12
+      tester: bob
+      risk_areas:
+        - CheckoutService
+      notes: "Race condition found under concurrent checkout load"
+
+test_suite:
+  # Stable, covering story area → must-run
+  - id: TEST-201
+    name: checkout flow e2e
+    layer: e2e
+    coverage_areas: [CheckoutService]
+    execution_time_secs: 300
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  # Stable, covering dep area
+  - id: TEST-202
+    name: cart service unit
+    layer: unit
+    coverage_areas: [CartService]
+    execution_time_secs: 15
+    flakiness_rate: 0.02
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  # Flaky, shared coverage → retire candidate
+  - id: TEST-203
+    name: flaky checkout integration A
+    layer: integration
+    coverage_areas: [CheckoutService, CartService]
+    execution_time_secs: 120
+    flakiness_rate: 0.45
+    failure_count_last_30d: 8
+    automated: true
+    tags: []
+
+  # Flaky, shared coverage → retire candidate
+  - id: TEST-204
+    name: flaky checkout integration B
+    layer: integration
+    coverage_areas: [CheckoutService, CartService]
+    execution_time_secs: 120
+    flakiness_rate: 0.50
+    failure_count_last_30d: 10
+    automated: true
+    tags: []
+
+  # Flaky, shared coverage → retire candidate
+  - id: TEST-205
+    name: flaky cart unit duplicate
+    layer: unit
+    coverage_areas: [CartService]
+    execution_time_secs: 12
+    flakiness_rate: 0.38
+    failure_count_last_30d: 5
+    automated: true
+    tags: []
+
+  # Flaky but has unique coverage → NOT a retire candidate
+  - id: TEST-206
+    name: flaky inventory unique check
+    layer: unit
+    coverage_areas: [InventoryService]
+    execution_time_secs: 20
+    flakiness_rate: 0.42
+    failure_count_last_30d: 6
+    automated: true
+    tags: []
+
+  # Stable, unrelated area
+  - id: TEST-207
+    name: user auth unit
+    layer: unit
+    coverage_areas: [AuthService]
+    execution_time_secs: 8
+    flakiness_rate: 0.00
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+constraints:
+  time_budget_mins: 15
+  mandatory_tags: []
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20

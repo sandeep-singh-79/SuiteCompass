@@ -1,0 +1,37 @@
+# Assertions for: high-risk-feature-sprint
+# All checks are binary pass/fail against the rendered markdown report.
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Flakiness Tier High:"
+
+must_include_substrings:
+  # NFR elevation active (high-risk sprint)
+  - "NFR Elevation: Yes"
+  # Performance and security tests are must-run overrides
+  - "TEST-003"
+  - "TEST-004"
+  # Mandatory-tag test is must-run
+  - "TEST-001"
+  # Manual test is tagged (manual) and included in output
+  - "(manual)"
+  - "TEST-007"
+  # Sprint risk is high
+  - "Sprint Risk Level: high"
+
+must_not_include_substrings:
+  # Manual test must never be retired (retire format: "flakiness: ..., no unique coverage")
+  - "TEST-007 legacy smoke manual (flakiness:"

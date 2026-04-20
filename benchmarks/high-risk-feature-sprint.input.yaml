@@ -1,0 +1,109 @@
+# Benchmark: high-risk-feature-sprint
+# Sprint with a high-risk story changing PaymentService/RetryHandler.
+# Expected: NFR elevation active, performance + security tests in must-run,
+#           PaymentService tests in must-run, budget overflow possible.
+
+sprint_context:
+  sprint_id: SPRINT-HRF-01
+  stories:
+    - id: PROJ-1100
+      title: Add retry logic to PaymentService
+      risk: high
+      type: feature
+      changed_areas:
+        - PaymentService
+        - RetryHandler
+      dependency_stories:
+        - PROJ-1099
+    - id: PROJ-1099
+      title: Refactor OrderFacade
+      risk: medium
+      type: refactor
+      changed_areas:
+        - OrderFacade
+        - PaymentService
+      dependency_stories: []
+  exploratory_sessions:
+    - session_id: EX-07
+      tester: alice
+      risk_areas:
+        - RetryHandler
+        - PaymentService
+      notes: "Observed intermittent timeouts under retry storm conditions"
+
+test_suite:
+  - id: TEST-001
+    name: payment flow e2e
+    layer: e2e
+    coverage_areas: [PaymentService, OrderFacade]
+    execution_time_secs: 480
+    flakiness_rate: 0.02
+    failure_count_last_30d: 1
+    automated: true
+    tags: [critical-flow]
+
+  - id: TEST-002
+    name: retry handler integration
+    layer: integration
+    coverage_areas: [RetryHandler]
+    execution_time_secs: 90
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-003
+    name: payment service load performance
+    layer: performance
+    coverage_areas: [PaymentService]
+    execution_time_secs: 300
+    flakiness_rate: 0.03
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-004
+    name: payment service security scan
+    layer: security
+    coverage_areas: [PaymentService]
+    execution_time_secs: 240
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-005
+    name: order facade unit
+    layer: unit
+    coverage_areas: [OrderFacade]
+    execution_time_secs: 15
+    flakiness_rate: 0.00
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-006
+    name: reporting dashboard e2e
+    layer: e2e
+    coverage_areas: [ReportingService]
+    execution_time_secs: 600
+    flakiness_rate: 0.05
+    failure_count_last_30d: 2
+    automated: true
+    tags: []
+
+  - id: TEST-007
+    name: legacy smoke manual
+    layer: e2e
+    coverage_areas: [PaymentService]
+    execution_time_secs: 1800
+    flakiness_rate: 0.10
+    failure_count_last_30d: 3
+    automated: false
+    tags: []
+
+constraints:
+  time_budget_mins: 20
+  mandatory_tags: [critical-flow]
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20

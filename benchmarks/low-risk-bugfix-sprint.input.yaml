@@ -1,0 +1,83 @@
+# Benchmark: low-risk-bugfix-sprint
+# Small bugfix sprint with one low-risk story, generous budget, stable suite.
+# Expected: 1-2 must-run tests, most in should-run or defer,
+#           zero retire candidates, no budget overflow, no NFR elevation.
+
+sprint_context:
+  sprint_id: SPRINT-LRB-01
+  stories:
+    - id: PROJ-2200
+      title: Fix null pointer in NotificationService
+      risk: low
+      type: bugfix
+      changed_areas:
+        - NotificationService
+      dependency_stories: []
+  exploratory_sessions: []
+
+test_suite:
+  - id: TEST-101
+    name: notification service unit
+    layer: unit
+    coverage_areas: [NotificationService]
+    execution_time_secs: 10
+    flakiness_rate: 0.00
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-102
+    name: notification service integration
+    layer: integration
+    coverage_areas: [NotificationService]
+    execution_time_secs: 30
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-103
+    name: user profile e2e
+    layer: e2e
+    coverage_areas: [UserProfileService]
+    execution_time_secs: 300
+    flakiness_rate: 0.02
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-104
+    name: payment flow e2e
+    layer: e2e
+    coverage_areas: [PaymentService]
+    execution_time_secs: 480
+    flakiness_rate: 0.02
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  - id: TEST-105
+    name: reporting dashboard e2e
+    layer: e2e
+    coverage_areas: [ReportingService]
+    execution_time_secs: 600
+    flakiness_rate: 0.03
+    failure_count_last_30d: 1
+    automated: true
+    tags: []
+
+  - id: TEST-106
+    name: search service unit
+    layer: unit
+    coverage_areas: [SearchService]
+    execution_time_secs: 8
+    flakiness_rate: 0.00
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+constraints:
+  time_budget_mins: 60
+  mandatory_tags: []
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20
