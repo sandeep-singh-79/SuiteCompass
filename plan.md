@@ -114,3 +114,51 @@ The learning guide should teach regression suite thinking, not just tool usage. 
 - SCENARIO-LIBRARY has >=6 named scenarios, each with context + expected behaviour
 - LEARNING-GUIDE has >=5 sections teaching regression thinking
 - All doc files are linked from README
+
+---
+
+## Phase 3 — Excel Import Adapter
+
+Enable teams to feed their existing test inventory from spreadsheets instead of hand-writing YAML.
+
+### Adapter Tracks
+
+| Track | Goal | Status | Notes |
+|---|---|---|---|
+| A1 - Excel Template | Sample .xlsx with correct column headers + example rows | Not Started | Ships with repo under templates/ |
+| A2 - Excel Loader | `excel_loader.py` — reads .xlsx, maps columns to test_suite schema, outputs YAML | Not Started | openpyxl dependency |
+| A3 - CLI `import-tests` | `iro import-tests tests.xlsx --output test_suite.yaml` subcommand | Not Started | Generates test_suite section only |
+| A4 - Merge Utility | `iro run --tests test_suite.yaml --sprint sprint.yaml` or auto-merge | Not Started | Optional convenience; manual merge is fallback |
+| A5 - Validation | Validate Excel columns, report missing/invalid data with row numbers | Not Started | Same rigour as YAML input validation |
+| A6 - Tests + Benchmarks | >=15 tests; sample .xlsx in benchmarks/ | Not Started | TDD: red, green, refactor |
+
+### Column Mapping (default)
+
+| Excel Column | YAML Field | Required | Notes |
+|---|---|---|---|
+| ID | id | Yes | |
+| Name | name | Yes | |
+| Layer | layer | Yes | e2e, integration, unit, security, performance |
+| Coverage Areas | coverage_areas | Yes | Comma-separated |
+| Execution Time (secs) | execution_time_secs | Yes | Numeric |
+| Flakiness Rate | flakiness_rate | Yes | 0.0 – 1.0 |
+| Failure Count (30d) | failure_count_last_30d | No | Default 0 |
+| Automated | automated | No | Default true |
+| Tags | tags | No | Comma-separated |
+
+### Adapter Acceptance Criteria
+
+- `iro import-tests sample.xlsx` produces valid test_suite YAML that passes input validation
+- Missing required columns fail with clear error message and column name
+- Invalid cell values report row number and column
+- Round-trip: import .xlsx → merge with sprint YAML → `iro run` → exit 0
+
+---
+
+## Phase 4+ — Future Adapters (not scoped)
+
+| Adapter | Purpose | Trigger |
+|---|---|---|
+| Jira | Auto-populate sprint_context.stories from sprint board | When adoption justifies API integration |
+| JUnit XML | Derive flakiness_rate and failure_count from historical test runs | When teams need automated enrichment |
+| TestRail / Zephyr | Direct test management system import | When specific TMS adoption is confirmed |
