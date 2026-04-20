@@ -102,8 +102,24 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Implementation is in progress. See plan.md for current step.
+- Phase 1 MVP (T1-T12) COMPLETE. Committed on branch `phase-1-deterministic-core` (HEAD: 281d27b).
+- 159 tests passing, 99.07% coverage.
+- Next: decide whether to merge feature branch to master or start Phase 2 (LLM integration planning).
 
 ## Blockers
 - None.
+
+## Completed Milestones
+- T1: Repo setup
+- T2: Product definition
+- T3: Python scaffold (11 tests)
+- T4: Output contract / output_validator.py (21 tests)
+- T5: input_loader.py (22 tests)
+- T6: context_classifier.py (17 tests)
+- T7: scoring_engine.py (34 tests)
+- T8: renderer.py + integration (18 tests)
+- T9: Benchmark YAMLs (3 scenarios × 2 files)
+- T10: end_to_end_flow.py + benchmark_runner.py (11 tests)
+- T11: cli.py with `iro run` and `iro benchmark` subcommands (13 tests)
+- T12: Coverage hardening — all modules >=90%, total 99.07% (159 tests)
 
