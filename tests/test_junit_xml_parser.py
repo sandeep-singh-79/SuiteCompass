@@ -84,6 +84,8 @@ class TestParseJunitDirectory:
         assert rec.total_runs == 1
 
     def test_single_file_some_fail(self, tmp_path):
+        # Single run: failure without adjacent pass → flakiness unknown → 0.0
+        # failure_count_last_30d still records the failure
         xml = _make_suite_xml([
             ("test_a", "P.T", False, False),
             ("test_b", "P.T", True, False),
@@ -91,7 +93,7 @@ class TestParseJunitDirectory:
         _write(tmp_path / "run-01.xml", xml)
         result = parse_junit_directory(str(tmp_path))
         assert result["P.T::test_a"].flakiness_rate == pytest.approx(0.0)
-        assert result["P.T::test_b"].flakiness_rate == pytest.approx(1.0)
+        assert result["P.T::test_b"].flakiness_rate == pytest.approx(0.0)
         assert result["P.T::test_b"].failure_count_last_30d == 1
 
     # --- multiple files ---
@@ -103,11 +105,12 @@ class TestParseJunitDirectory:
         assert result["X::t"].flakiness_rate == pytest.approx(0.0)
         assert result["X::t"].total_runs == 3
 
-    def test_multiple_files_consistent_fail_rate_is_one(self, tmp_path):
+    def test_multiple_files_consistent_failures_are_not_flaky(self, tmp_path):
+        # 4 consecutive failures with no intervening pass → not flaky (consistently broken)
         for i in range(4):
             _write(tmp_path / f"run-0{i}.xml", _make_suite_xml([("t", "X", True, False)]))
         result = parse_junit_directory(str(tmp_path))
-        assert result["X::t"].flakiness_rate == pytest.approx(1.0)
+        assert result["X::t"].flakiness_rate == pytest.approx(0.0)
         assert result["X::t"].total_runs == 4
 
     def test_multiple_files_mixed_correct_flakiness_rate(self, tmp_path):
@@ -141,6 +144,8 @@ class TestParseJunitDirectory:
         assert "X::test_skip" not in result
 
     def test_error_element_counts_as_failure(self, tmp_path):
+        # <error> is treated as failure; single run → flakiness_rate=0.0 (no adjacent run to compare)
+        # failure_count_last_30d still records the failure
         suite = ET.Element("testsuite")
         suite.set("name", "T")
         tc = ET.SubElement(suite, "testcase")
@@ -150,7 +155,7 @@ class TestParseJunitDirectory:
         err.set("message", "RuntimeError")
         _write(tmp_path / "run-01.xml", ET.tostring(suite, encoding="unicode"))
         result = parse_junit_directory(str(tmp_path))
-        assert result["Pkg::test_err"].flakiness_rate == pytest.approx(1.0)
+        assert result["Pkg::test_err"].flakiness_rate == pytest.approx(0.0)
         assert result["Pkg::test_err"].failure_count_last_30d == 1
 
     def test_classname_included_in_test_id(self, tmp_path):
@@ -217,6 +222,23 @@ class TestParseJunitDirectory:
         _write(tmp_path / "broken-run.xml", "<unclosed>")
         with pytest.raises(InputValidationError, match="broken-run.xml"):
             parse_junit_directory(str(tmp_path))
+
+    def test_failure_adjacent_to_pass_is_flaky(self, tmp_path):
+        # fail, pass → run 1 fails and run 2 passes → run 1 is a flaky occurrence
+        _write(tmp_path / "run-01.xml", _make_suite_xml([("t", "X", True, False)]))
+        _write(tmp_path / "run-02.xml", _make_suite_xml([("t", "X", False, False)]))
+        result = parse_junit_directory(str(tmp_path))
+        assert result["X::t"].flakiness_rate == pytest.approx(1 / 2)
+        assert result["X::t"].total_runs == 2
+
+    def test_isolated_failure_between_passes_is_flaky(self, tmp_path):
+        # pass, fail, pass → run 2 fails between passes → flaky occurrence
+        _write(tmp_path / "run-01.xml", _make_suite_xml([("t", "X", False, False)]))
+        _write(tmp_path / "run-02.xml", _make_suite_xml([("t", "X", True, False)]))
+        _write(tmp_path / "run-03.xml", _make_suite_xml([("t", "X", False, False)]))
+        result = parse_junit_directory(str(tmp_path))
+        assert result["X::t"].flakiness_rate == pytest.approx(1 / 3)
+        assert result["X::t"].total_runs == 3
 
     def test_unparseable_timestamp_treated_as_no_timestamp(self, tmp_path):
         # Non-ISO timestamp → _parse_timestamp returns None → run included in last_30d

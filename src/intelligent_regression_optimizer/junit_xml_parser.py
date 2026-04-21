@@ -100,9 +100,30 @@ def _extract_from_root(root: ET.Element) -> list[tuple[str, _RunEntry]]:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+def _compute_flakiness_rate(entries: list[_RunEntry]) -> float:
+    """Return the fraction of runs that exhibit flaky behaviour.
+
+    A failure is counted as *flaky* when at least one adjacent run (prev or
+    next by file order) was a pass.  Consistent failures have no adjacent pass
+    and therefore contribute 0 to the numerator.
+
+    ``entries`` are assumed to be in lexicographic file order, which is treated
+    as chronological order.  Callers must ensure this ordering holds for the
+    heuristic to be meaningful.
+    """
+    total = len(entries)
+    if total == 0:
+        return 0.0
+    flaky = 0
+    for i, entry in enumerate(entries):
+        if not entry.failed:
+            continue
+        prev_passed = i > 0 and not entries[i - 1].failed
+        next_passed = i < total - 1 and not entries[i + 1].failed
+        if prev_passed or next_passed:
+            flaky += 1
+    return flaky / total
+
 
 def parse_junit_directory(
     dir_path: str,
@@ -115,7 +136,9 @@ def parse_junit_directory(
 
     Metrics computed per test:
     - total_runs: number of runs in which the test appeared (skipped excluded)
-    - flakiness_rate: failure_count / total_runs
+    - flakiness_rate: fraction of runs that are *flaky* (failure adjacent to a
+      pass in the sorted-by-filename run sequence, which is treated as
+      chronological order — consistent failures score 0.0)
     - failure_count_last_30d: failures from runs within 30 days of reference_date;
       runs without a parseable timestamp are included conservatively
 
@@ -161,8 +184,7 @@ def parse_junit_directory(
 
     for test_id, entries in accumulator.items():
         total_runs = len(entries)
-        failure_count = sum(1 for e in entries if e.failed)
-        flakiness_rate = failure_count / total_runs if total_runs > 0 else 0.0
+        flakiness_rate = _compute_flakiness_rate(entries)
 
         # Include failures from runs that are: (a) within 30 days OR (b) have no timestamp
         failure_count_last_30d = sum(

@@ -132,10 +132,30 @@ In earlier input formats, `flakiness_rate` and `failure_count_last_30d` were ent
 **The heuristic:**
 
 ```
-flakiness_rate         = total_failures / total_runs
+flakiness_rate         = flaky_failures / total_runs
+
+A failure is "flaky" when at least one adjacent run (by filename order,
+treated as chronological order) was a pass.  Consistent failures have no
+adjacent pass and contribute 0 to the numerator, giving flakiness_rate = 0.0.
+
 failure_count_last_30d = failures in runs with timestamp ≤ 30 days old
                          (runs without a timestamp are included conservatively)
 ```
+
+**Examples:**
+
+| Run sequence        | flakiness_rate | Interpretation            |
+|---------------------|----------------|---------------------------|
+| fail, fail, fail    | 0.0            | Consistently broken       |
+| fail, pass          | 0.5            | First run flaky (adj pass)|
+| fail, pass, fail    | 0.667          | Both failures are flaky   |
+| pass, fail, pass    | 0.333          | Isolated mid-run failure  |
+
+**File-order assumption:** XML files in the directory are sorted lexicographically
+(`sorted()`).  Because CI systems typically name artefacts with date- or
+sequence-prefixed filenames (e.g. `run-01.xml`, `2026-04-15.xml`),
+lexicographic order is treated as chronological.  If your files are not named
+this way, the heuristic may be unreliable.
 
 **Supported formats:**
 - pytest-junit: `<testsuite>` at the XML root (standard `pytest --junit-xml` output)

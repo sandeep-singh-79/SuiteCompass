@@ -36,6 +36,11 @@ def _validate_record(
             f"failure_count_last_30d must be a non-negative integer for test_id={test_id!r} "
             f"in {source}, got {failure_count_last_30d!r}"
         )
+    if total_runs < 0:
+        raise InputValidationError(
+            f"total_runs must be a non-negative integer for test_id={test_id!r} "
+            f"in {source}, got {total_runs!r}"
+        )
 
 
 def _check_required_columns(columns: set[str], source: str) -> None:
@@ -72,10 +77,6 @@ def load_history_csv(path: str) -> dict[str, TestHistoryRecord]:
     p = pathlib.Path(path)
     if not p.exists():
         raise InputValidationError(f"History file not found: {path!r}")
-
-    content = p.read_text(encoding="utf-8").strip()
-    if not content:
-        return {}
 
     source = p.name
     result: dict[str, TestHistoryRecord] = {}
@@ -163,7 +164,7 @@ def load_history_json(path: str) -> dict[str, TestHistoryRecord]:
         return {}
 
     # Validate required keys using the first record's key set (treat as schema)
-    first_keys = set(data[0].keys()) if data else set()
+    first_keys = set(data[0].keys())
     _check_required_columns(first_keys, source)
 
     result: dict[str, TestHistoryRecord] = {}
