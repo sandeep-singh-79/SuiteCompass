@@ -125,6 +125,32 @@ A test has **unique coverage** if at least one of its coverage areas is not cove
 - **Unique coverage present:** never retire, even if flaky — fix the flakiness instead
 - **No unique coverage:** safe to retire if flakiness is above threshold
 
+### How Flakiness is Computed from CI History (V1-A)
+
+In earlier input formats, `flakiness_rate` and `failure_count_last_30d` were entered manually in the YAML. With `--history-dir`, SuiteCompass can derive these values automatically from a directory of JUnit XML files (one file per CI run).
+
+**The heuristic:**
+
+```
+flakiness_rate         = total_failures / total_runs
+failure_count_last_30d = failures in runs with timestamp ≤ 30 days old
+                         (runs without a timestamp are included conservatively)
+```
+
+**Supported formats:**
+- pytest-junit: `<testsuite>` at the XML root (standard `pytest --junit-xml` output)
+- Maven Surefire: `<testsuites>` wrapping `<testsuite>` children
+
+**Limitations to be aware of:**
+- Each XML file is treated as exactly one test run — filename order does not affect the aggregate rate
+- A test absent from a file (not run, not skipped) does not contribute to `total_runs` for that file
+- `<skipped>` tests are excluded from all calculations
+- `<error>` elements are treated identically to `<failure>` elements
+- If no timestamp is present on a `<testsuite>`, that run's failures are included in `failure_count_last_30d` conservatively (we cannot confirm it was old)
+- History values take precedence over manually entered YAML values; a warning is logged when an override occurs
+
+**Manual override remains available:** if CI history is unavailable or incomplete, you can still enter `flakiness_rate` and `failure_count_last_30d` directly in the YAML and omit `--history-dir`.
+
 ---
 
 ## 4. How to Interpret a SuiteCompass Report
