@@ -50,6 +50,10 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 |---|---|---|---|
 | `iro run <input.yaml>` | Run optimisation pipeline, print report | `--output, -o <path>` | 0 = success, 1 = validation error, 2 = input error |
 | `iro run --tests <t.yaml> --sprint <s.yaml>` | Merge separate test suite + sprint context files and run | `--output, -o <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --history-dir <dir>` | Run with JUnit XML CI history overlay | `--history-dir <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --history-file <file>` | Run with pre-computed CSV/JSON history overlay | `--history-file <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --area-map <map> --ref <ref>` | Run with git-diff-derived `changed_areas` override | `--area-map <path>`, `--diff-file <path>`, `--ref <git-ref>` | 0 = success, 2 = input error |
+| `iro diff-areas --area-map <map> --ref <ref>` | Print YAML fragment of changed areas from git diff | `--area-map <path>`, `--diff-file <path>`, `--ref <git-ref>` | 0 = success, 2 = input error |
 | `iro benchmark <input.yaml> <assertions.yaml>` | Run pipeline + validate against assertions | — | 0 = pass, 1 = fail, 2 = input error |
 | `iro import-tests <file.xlsx>` | Import Excel test inventory as test_suite YAML | `--output, -o <path>`, `--sheet, -s <name>` | 0 = success, 2 = input error |
 
@@ -75,8 +79,10 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | Phase 1 (Deterministic Core) | Complete |
 | Phase 3 (Excel Adapter — all tracks A1–A6) | Complete |
 | Phase 2 (Documentation) | Complete |
-| Tests | 248 |
-| Coverage | 97.7% |
+| V1-A (CI history overlay) | Complete |
+| V1-B (git diff area mapper) | Complete |
+| Tests | 400+ |
+| Coverage | ≥ 97% |
 | Python | ≥ 3.13 |
 
 ## License

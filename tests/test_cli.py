@@ -383,4 +383,40 @@ class TestHistoryFlags:
         result = runner.invoke(main, ["run", str(input_p), "--history-file", str(json_p)])
         assert result.exit_code == 2
 
+    # --- R2: history override warnings surfaced to operator ---
+
+    def test_history_override_warning_appears_in_output(self, tmp_path):
+        """When history changes flakiness_rate, a warning must be emitted."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.05)
+        csv_p = tmp_path / "history.csv"
+        # History has a different flakiness_rate → override warning expected
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.9,18,20\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        assert "T-001" in result.output
+        assert "history-override" in result.output.lower()
+
+    def test_no_override_warning_when_flakiness_unchanged(self, tmp_path):
+        """No warning emitted when history flakiness_rate matches the YAML value."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.1)
+        csv_p = tmp_path / "history.csv"
+        # Same flakiness_rate → no override
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.1,1,10\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        assert "history-override" not in result.output.lower()
+
+    def test_override_warning_leaves_markdown_report_intact(self, tmp_path):
+        """Markdown report is present and well-formed even when a warning is emitted."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.05)
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.9,18,20\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        # Markdown report always starts with a heading
+        assert "#" in result.output
+
 

@@ -115,15 +115,18 @@ def run_pipeline(
     normalized = package.normalized
 
     # 2. Overlay history when provided
+    history_warnings: list[str] = []
     if history:
-        normalized, _ = merge_history(normalized, history)
+        normalized, history_warnings = merge_history(normalized, history)
 
     # 3. Override changed_areas when derived from diff
     if changed_areas is not None:
         from intelligent_regression_optimizer.diff_mapper import apply_area_map
         normalized = apply_area_map(normalized, changed_areas)
 
-    return _run_from_package(normalized)
+    result = _run_from_package(normalized)
+    result.warnings = history_warnings
+    return result
 
 
 def run_pipeline_from_merged(
@@ -151,14 +154,17 @@ def run_pipeline_from_merged(
     except InputValidationError as exc:
         return FlowResult(exit_code=EXIT_INPUT_ERROR, message=str(exc), output_path=None)
 
+    history_warnings: list[str] = []
     if history:
-        normalized, _ = merge_history(normalized, history)
+        normalized, history_warnings = merge_history(normalized, history)
 
     if changed_areas is not None:
         from intelligent_regression_optimizer.diff_mapper import apply_area_map
         normalized = apply_area_map(normalized, changed_areas)
 
-    return _run_from_package(normalized)
+    result = _run_from_package(normalized)
+    result.warnings = history_warnings
+    return result
 
 
 def _run_from_package(normalized: dict[str, Any]) -> FlowResult:

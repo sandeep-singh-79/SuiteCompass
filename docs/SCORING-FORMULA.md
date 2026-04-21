@@ -246,3 +246,31 @@ Action: fix the flakiness. This test cannot be retired without leaving Checkout 
 **Case 2 — test has no unique coverage** (another test also covers `Checkout`):
 Retire check: `automated: true` ✓, `flakiness_rate 0.32 > threshold 0.30` ✓, no unique coverage ✓ → **Retire Candidate**.
 The raw score of 7.44 is never used — retire evaluation happens before tiering. The test does not appear in any scored tier.
+
+---
+
+## History Precedence
+
+When `--history-dir` or `--history-file` is supplied, the history-derived `flakiness_rate` takes precedence over the value in the input YAML.
+
+**Rule:** If `history.flakiness_rate != yaml.flakiness_rate`, the history value is used **everywhere** — retire threshold check, flakiness penalty in the scoring formula, and the suite health summary.
+
+**Why history wins:** CI history is measured, not estimated. YAML values are authoring-time guesses. History is more current by definition.
+
+**Warning emission:** When a history override occurs, a `[history-override]` warning is printed to stderr. This makes the override visible to the operator without affecting the deterministic markdown report.
+
+**Example:**
+
+| Source | `flakiness_rate` | Retire check (threshold 0.30) |
+|---|---|---|
+| YAML input | 0.05 | below threshold → not a retire candidate |
+| CI history (10 runs, 5 failures) | 0.50 | above threshold → retire candidate |
+| **Result with history applied** | **0.50** | **retire candidate** |
+
+The scoring formula in this case becomes:
+```
+flakiness_penalty = 8.0 × 0.50 = 4.0    # history value used
+```
+The `[history-override]` warning on stderr: `test_id='T-001': flakiness_rate 0.050 → 0.500 (history wins)`
+
+**Timestamp scope:** Timestamps are read from `<testsuite>` elements only. `failure_count_last_30d` counts failures from runs within 30 calendar days of today (based on the `timestamp` attribute). Runs with no parseable timestamp are included conservatively (counted as within 30 days).

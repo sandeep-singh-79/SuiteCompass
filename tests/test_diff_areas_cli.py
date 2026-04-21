@@ -171,6 +171,16 @@ class TestDiffAreasCommand:
         result = runner.invoke(main, ["diff-areas"])
         assert result.exit_code == 2
 
+    def test_area_map_only_no_diff_source_exits_2(self, tmp_path):
+        """--area-map without --diff-file or --ref must exit 2 (explicit diff source required)."""
+        area_map = _write_area_map(tmp_path, [{"pattern": "src/**", "areas": ["A"]}])
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "diff-areas",
+            "--area-map", str(area_map),
+        ])
+        assert result.exit_code == 2
+
     def test_git_ref_mode_calls_subprocess(self, tmp_path):
         """--ref mode calls subprocess; mock it to avoid git dependency."""
         area_map = _write_area_map(tmp_path, [

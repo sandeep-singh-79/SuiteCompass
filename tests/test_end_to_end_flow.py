@@ -3,6 +3,8 @@ import pathlib
 import pytest
 from intelligent_regression_optimizer.end_to_end_flow import run_pipeline, merge_history, run_pipeline_from_merged
 from intelligent_regression_optimizer.models import EXIT_OK, EXIT_INPUT_ERROR, TestHistoryRecord
+from intelligent_regression_optimizer.junit_xml_parser import parse_junit_directory
+from intelligent_regression_optimizer.benchmark_runner import run_assertions
 
 BENCHMARKS = pathlib.Path(__file__).parent.parent / "benchmarks"
 TMP = pathlib.Path(__file__).parent.parent / "tmp"
@@ -291,4 +293,143 @@ class TestRunPipelineFromMergedWithHistory:
         }
         result = run_pipeline_from_merged(data)
         assert result.exit_code == EXIT_OK
+
+
+# ---------------------------------------------------------------------------
+# R2: run_pipeline() and run_pipeline_from_merged() surface warnings in FlowResult
+# ---------------------------------------------------------------------------
+
+class TestPipelineWarningsPropagation:
+    def test_pipeline_warnings_populated_on_override(self, tmp_path):
+        """run_pipeline() must populate FlowResult.warnings when history overrides flakiness."""
+        import yaml
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": "T-001",
+                    "name": "Test 001",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.05,
+                    "automated": True,
+                }
+            ],
+            "constraints": {},
+        }
+        p = tmp_path / "input.yaml"
+        p.write_text(yaml.safe_dump(data))
+        history = {"T-001": TestHistoryRecord("T-001", flakiness_rate=0.9, failure_count_last_30d=9, total_runs=10)}
+        result = run_pipeline(str(p), history=history)
+        assert result.exit_code == EXIT_OK
+        assert len(result.warnings) == 1
+        assert "T-001" in result.warnings[0]
+
+    def test_pipeline_warnings_empty_without_override(self, tmp_path):
+        """run_pipeline() warnings must be empty when flakiness matches history."""
+        import yaml
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": "T-001",
+                    "name": "Test 001",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.1,
+                    "automated": True,
+                }
+            ],
+            "constraints": {},
+        }
+        p = tmp_path / "input.yaml"
+        p.write_text(yaml.safe_dump(data))
+        history = {"T-001": TestHistoryRecord("T-001", flakiness_rate=0.1, failure_count_last_30d=1, total_runs=10)}
+        result = run_pipeline(str(p), history=history)
+        assert result.exit_code == EXIT_OK
+        assert result.warnings == []
+
+    def test_pipeline_from_merged_warnings_populated_on_override(self):
+        """run_pipeline_from_merged() must also propagate warnings."""
+        data = {
+            "sprint_context": {"stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}]},
+            "test_suite": [
+                {
+                    "id": "T-002",
+                    "name": "Test 002",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.0,
+                    "automated": True,
+                }
+            ],
+            "constraints": {},
+        }
+        history = {"T-002": TestHistoryRecord("T-002", flakiness_rate=0.8, failure_count_last_30d=8, total_runs=10)}
+        result = run_pipeline_from_merged(data, history=history)
+        assert result.exit_code == EXIT_OK
+        assert len(result.warnings) == 1
+        assert "T-002" in result.warnings[0]
+
+
+# ---------------------------------------------------------------------------
+# R4: benchmarks/with-history/ end-to-end assertion benchmark
+# ---------------------------------------------------------------------------
+
+HISTORY_BENCHMARK = BENCHMARKS / "with-history"
+
+
+class TestHistoryBenchmark:
+    def test_history_benchmark_exits_ok(self):
+        """Full pipeline with JUnit XML history runs without error."""
+        xml_dir = HISTORY_BENCHMARK / "junit-history"
+        history = parse_junit_directory(str(xml_dir))
+        result = run_pipeline(str(HISTORY_BENCHMARK / "input.yaml"), history=history)
+        assert result.exit_code == EXIT_OK, result.message
+
+    def test_history_benchmark_assertions_pass(self):
+        """All benchmark assertions prove that history changes recommendations."""
+        xml_dir = HISTORY_BENCHMARK / "junit-history"
+        history = parse_junit_directory(str(xml_dir))
+        result = run_pipeline(str(HISTORY_BENCHMARK / "input.yaml"), history=history)
+        assert result.exit_code == EXIT_OK
+        ar = run_assertions(result.message, str(HISTORY_BENCHMARK / "assertions.yaml"))
+        assert ar.is_valid, ar.errors
+
+    def test_history_benchmark_flaky_test_retired(self):
+        """T-HIST-FLAKY is a retire candidate when history drives flakiness above threshold."""
+        xml_dir = HISTORY_BENCHMARK / "junit-history"
+        history = parse_junit_directory(str(xml_dir))
+        result = run_pipeline(str(HISTORY_BENCHMARK / "input.yaml"), history=history)
+        assert result.exit_code == EXIT_OK
+        assert "SprintSuite::flaky_history" in result.message
+
+    def test_history_benchmark_stable_test_not_retired(self):
+        """T-HIST-STABLE is NOT a retire candidate: history shows 0 flakiness despite YAML value."""
+        xml_dir = HISTORY_BENCHMARK / "junit-history"
+        history = parse_junit_directory(str(xml_dir))
+        result = run_pipeline(str(HISTORY_BENCHMARK / "input.yaml"), history=history)
+        assert result.exit_code == EXIT_OK
+        # Retire format: "test_id test_name (flakiness: ..."
+        assert "SprintSuite::stable_history (flakiness:" not in result.message
+
+    def test_history_benchmark_override_warnings_emitted(self):
+        """Override warnings are present in FlowResult.warnings for both tests."""
+        xml_dir = HISTORY_BENCHMARK / "junit-history"
+        history = parse_junit_directory(str(xml_dir))
+        result = run_pipeline(str(HISTORY_BENCHMARK / "input.yaml"), history=history)
+        assert result.exit_code == EXIT_OK
+        # Both tests have different YAML vs history flakiness → 2 warnings
+        assert len(result.warnings) == 2
+        warning_text = " ".join(result.warnings)
+        assert "SprintSuite::flaky_history" in warning_text
+        assert "SprintSuite::stable_history" in warning_text
+
 

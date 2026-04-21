@@ -70,6 +70,7 @@ class FlowResult:
     exit_code: int
     message: str
     output_path: str | None
+    warnings: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

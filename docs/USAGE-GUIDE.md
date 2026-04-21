@@ -276,7 +276,7 @@ The `--area-map` flag replaces `changed_areas` on **every story** in the input w
 
 - `--area-map` requires exactly one of `--diff-file` or `--ref` (mutually exclusive)
 - `--diff-file` must point to an existing file
-- `--ref` is passed directly to `git diff --name-only <ref>`; defaults to `HEAD~1` when not specified
+- `--ref` is passed directly to `git diff --name-only <ref>`. This option is required when `--diff-file` is not provided.
 - The tool must be run from within the repository root (or any sub-directory) for `--ref` to work
 
 ---
@@ -325,7 +325,7 @@ Supply `--area-map` with `--diff-file` or `--ref` to auto-derive `changed_areas`
 **History flag rules:**
 - `--history-dir` and `--history-file` are mutually exclusive.
 - When a test ID in history matches a test in the YAML, `flakiness_rate` is replaced by the history value; `failure_count_last_30d` and `total_runs` are added.
-- A `[history-override]` message is printed to stdout for each test where the YAML and history values differ.
+- A `[history-override]` warning is printed to **stderr** for each test where the YAML and history values differ.
 - Tests absent from history are left unchanged.
 
 **Area-map flag rules:**

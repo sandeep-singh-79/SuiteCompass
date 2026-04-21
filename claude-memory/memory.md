@@ -9,8 +9,8 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: v0.3.1 SEALED (248 tests, 97.7% coverage). Phase 1 deterministic core + Phase 3 Excel adapter + Phase 2 documentation — all complete. v1.0 plan designed and written to `plan.md`. **Next action: begin V1-A sub-phase A1** (TestHistoryRecord model + history_loader.py) on branch `v1a-test-history`.
-- Active branch: `master` is the sealed base. New work on `v1a-test-history`.
+- Current stage: V1-A and V1-B are implemented on `v1b-diff-mapper`, but review found critical and major follow-up gaps before full acceptance. A concrete remediation plan has been written to `plan.md` and is awaiting implementation confirmation.
+- Active branch: `v1b-diff-mapper`.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
@@ -144,11 +144,9 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- **MVP SEALED.** No further work planned on this repo.
-- All phases (1 + 2 + 3) delivered, merged to master, tagged v0.3.0.
-- 248 tests, 97.7% coverage, 58 benchmark assertions green.
-- Deferred items (LLM narrative, JUnit XML, SCM, Jira, multi-hop) permanently backlogged.
-- Program focus moves to next capability system.
+- Execute the persisted V1-A / V1-B remediation plan in `plan.md` after explicit user confirmation.
+- Execution order is dependency-first: R1 diff-areas contract, R2 history override visibility, R3 timestamp reconciliation, R4 history benchmark, R5 docs catch-up.
+- Implementation has not started yet; current state is planning only.
 
 ## Blockers
 - None.

@@ -13,8 +13,127 @@
 | Capability | intelligent-regression-optimizer |
 | Objective | MVP SEALED |
 | Current Phase | All phases (1 + 2 + 3) complete |
-| Current Focus | docs-fix-review-gaps branch merged; ready for next capability |
+| Current Focus | critical/major V1-A and V1-B review-gap remediation plan defined; awaiting implementation confirmation |
 | Last Updated | 2026-04-21 |
+
+---
+
+## Active Remediation Plan
+
+> **Status:** Planned only. Do not start implementation until explicit user confirmation.
+> **Scope:** Critical and major fixes from the V1-A / V1-B review only.
+> **Execution rule:** Dependencies take precedence over ROI; every task follows red -> green -> refactor, targeted validation first, then full regression.
+
+### Execution Order
+
+| Order | Track | Priority | Effort | Depends On | Status |
+|---|---|---|---|---|---|
+| R1 | diff-areas contract alignment | Critical | Small | None | Planned |
+| R2 | history override visibility | Critical | Small-Medium | None | Planned |
+| R3 | JUnit timestamp rule reconciliation | Critical | Medium | None | Planned |
+| R4 | V1-A history benchmark artifact | Major | Medium | R2, R3 | Planned |
+| R5 | README + supporting doc catch-up | Major | Small-Medium | R1, R3, R4 | Planned |
+
+### Track R1 - diff-areas Contract Alignment
+
+**Goal:** Make implementation, tests, help text, and docs agree on the `iro diff-areas` contract.
+
+**Sub-tasks:**
+1. Decide the product contract:
+   - Option A: `iro diff-areas --area-map <path>` defaults to `HEAD~1`
+   - Option B: explicit `--diff-file` or `--ref` remains mandatory
+2. Update `cli.py` to match the chosen contract exactly.
+3. Update `tests/test_diff_areas_cli.py` so tests validate the final contract rather than the current mismatch.
+4. Update user-facing wording in CLI help and `docs/USAGE-GUIDE.md`.
+5. Run targeted CLI tests for `diff-areas` and `iro run --area-map`.
+
+**Validation:**
+- Help text, implementation, and tests describe the same behavior.
+- At least one targeted test covers the final no-arg/default-ref or explicit-ref behavior, depending on the decision.
+
+### Track R2 - history Override Visibility
+
+**Goal:** Ensure history-derived overrides are visible to the operator without changing the deterministic markdown output contract.
+
+**Sub-tasks:**
+1. Trace the override path from `merge_history()` through CLI rendering.
+2. Choose the surfacing mechanism:
+   - stderr warnings from CLI
+   - logging
+   - both, if still simple
+3. Stop discarding override warnings returned by `merge_history()`.
+4. Preserve markdown report determinism and avoid contaminating report output.
+5. Add tests proving override visibility when YAML flakiness differs from history values.
+6. Re-run targeted end-to-end history overlay tests.
+
+**Validation:**
+- A history override is operator-visible.
+- Markdown output still passes the existing output validator unchanged.
+- Tests assert both override behavior and warning visibility.
+
+### Track R3 - JUnit Timestamp Rule Reconciliation
+
+**Goal:** Make the code, tests, and plan agree on how `failure_count_last_30d` is derived.
+
+**Decision:** Suite-level timestamps only. Testcase-level timestamp support out-of-scope for V1-A.
+
+**Resolution:**
+- `junit_xml_parser.py` reads the `timestamp` attribute on `<testsuite>` elements only.
+- Runs with no timestamp are included conservatively (counted within last-30d).
+- 23 targeted parser tests cover suite-level timestamps, missing timestamps, and unparseable timestamps.
+- Tests 15–17 in `test_junit_xml_parser.py::TestParseJunitDirectory` directly cover timestamp-based `failure_count_last_30d`.
+- Plan and docs now state suite-level timestamps explicitly. Testcase-level is deferred to a future increment.
+
+**Status:** COMPLETE (narrowed scope, docs updated)
+
+### Track R4 - V1-A History Benchmark Artifact
+
+**Goal:** Add the planned regression anchor proving history-backed behavior end-to-end.
+
+**Dependencies:** R2 and R3 must be complete first so the benchmark targets final behavior.
+
+**Sub-tasks:**
+1. Create `benchmarks/with-history/`.
+2. Add realistic sample JUnit XML files covering at least:
+   - one flaky test
+   - one stable test
+   - one recommendation shift driven by history
+3. Add input YAML designed to differ meaningfully with and without history applied.
+4. Add assertions YAML proving the intended history-driven output.
+5. Add or update tests to exercise the benchmark end-to-end.
+6. Confirm all existing benchmarks still pass unchanged.
+
+**Validation:**
+- `benchmarks/with-history/` exists with XML inputs, input YAML, and assertions.
+- There is objective proof that `--history-dir` changes output as intended.
+
+### Track R5 - README + Supporting Doc Catch-Up
+
+**Goal:** Close the remaining planned documentation gaps once behavior is stable.
+
+**Dependencies:**
+- R1 finalizes the `diff-areas` contract.
+- R3 finalizes timestamp semantics.
+- R4 provides the committed benchmark artifact.
+
+**Sub-tasks:**
+1. Update `README.md` CLI reference with shipped V1-A / V1-B flags and `iro diff-areas`.
+2. Update `docs/SCORING-FORMULA.md` with the history-precedence note promised in A3.
+3. Update `docs/BENCHMARK-AUTHORING.md` with conventions for history-backed benchmarks.
+4. Re-check `docs/USAGE-GUIDE.md` for consistency with the final `diff-areas` contract.
+5. Verify all examples and command snippets against the final implementation.
+
+**Validation:**
+- README is no longer stale relative to the shipped CLI.
+- The plan-promised V1-A / V1-B documentation updates exist and are accurate.
+
+### Global Execution Rules For R1-R5
+
+1. Follow TDD strictly: failing test first, then implementation, then refactor.
+2. Run targeted tests after each track before moving to the next track.
+3. Keep fixes minimal and root-cause oriented; do not broaden scope into low/trivial cleanup.
+4. Preserve deterministic report structure unless a track explicitly requires otherwise.
+5. After R5, run full regression and perform a fresh acceptance review against the original findings.
 
 ---
 
@@ -345,69 +464,26 @@ V1-A (JUnit XML + History)    V1-B (Git Diff Mapper)   ← independent, parallel
 
 ---
 
-### Phase V1-B: Git Diff → Coverage Area Mapper
+### Phase V1-B: Git Diff → Coverage Area Mapper ✅ COMPLETE
 
 **Goal:** Derive changed_areas from git diff instead of manual declaration.
 **Branch:** `v1b-diff-mapper`
 **Decisions:** Lightweight git-diff mapper with config file. CI webhook backlogged.
 
-#### Sub-phase B1: Area Mapping Config + Mapper
+#### Sub-phase B1: Area Mapping Config + Mapper ✅ COMPLETE
+Commit: `095bddc` — 35 tests, 100% coverage.
 
-**TDD targets:**
-1. Define area mapping config format (`area-map.yaml`):
-   ```yaml
-   mappings:
-     - pattern: "src/payments/**"
-       areas: [PaymentService]
-     - pattern: "src/orders/**"
-       areas: [OrderFacade, OrderService]
-     - pattern: "tests/**"
-       areas: []   # test-only changes → no coverage area
-   ```
-2. Implement `diff_mapper.py`:
-   - `load_area_map(path: str) -> list[AreaMapping]` — validate config schema
-   - `parse_diff_output(text: str) -> list[str]` — extract file paths from `git diff --name-only` output
-   - `map_files_to_areas(files: list[str], mappings: list[AreaMapping]) -> set[str]` — apply fnmatch globs
-   - Use `fnmatch.fnmatch` (stdlib) for glob matching
-3. Tests (~12): various diff outputs, glob matching, no-match files, overlapping patterns, empty diff, malformed config, file in multiple patterns (union of areas)
+#### Sub-phase B2: CLI Subcommand + iro run Integration ✅ COMPLETE
+Commit: `9fedd32` — 394 tests (19 new), 97.18% coverage.
+- `iro diff-areas` subcommand added
+- `iro run --area-map / --diff-file / --ref` flags wired
+- `end_to_end_flow.run_pipeline()` + `run_pipeline_from_merged()` accept `changed_areas`
 
-**Review checkpoint:** code review after green. Fix issues. Iterate.
-
-**Docs:** V1-INPUT-TEMPLATE — document `area-map.yaml` format and how changed_areas auto-derivation works.
-
-#### Sub-phase B2: CLI Subcommand + iro run Integration
-
-**TDD targets:**
-1. Add `iro diff-areas` subcommand:
-   - `--ref <git-ref>` (default: HEAD~1) — runs `git diff --name-only <ref>` via `subprocess`
-   - `--area-map <path>` — required config file
-   - `--diff-file <path>` — alternative: read pre-computed diff output from file (for CI piping)
-   - Output: YAML fragment `changed_areas: [Area1, Area2]` to stdout
-2. Optionally wire into `iro run`:
-   - `--area-map <path>` + `--ref <ref>` flags
-   - If provided, auto-derive changed_areas for all stories (override manual values)
-   - Stories still need manual `risk` and `dependency_stories`
-3. Tests (~10): subcommand output format, missing config, git not available (graceful error), diff-file mode, integration with iro run
-
-**Review checkpoint:** code review after green. Fix issues. Iterate.
-
-**Docs:**
-- USAGE-GUIDE: add Workflow 5 (Git Diff → Area Mapping) with step-by-step.
-- LEARNING-GUIDE: add subsection to "How Sprint Context Changes Test Selection" explaining how changed_areas can be auto-derived from SCM.
-- README: update CLI table with `diff-areas` subcommand and new flags.
-
-#### Sub-phase B3: Phase B Hardening
-
-1. Coverage check: all new modules ≥ 90%
-2. Run all existing benchmarks — no regression
-3. End-to-end test: `iro diff-areas` output piped into sprint YAML → `iro run` produces correct report
-4. Review B1–B2 code holistically. Fix issues. Iterate.
-5. Template `area-map.yaml` in `templates/` directory
-
-**Verification:**
-- All tests pass
-- `iro diff-areas --ref HEAD~1 --area-map templates/area-map.yaml` produces valid YAML
-- All modules ≥ 90% coverage
+#### Sub-phase B3: Phase B Hardening ✅ COMPLETE
+Commit: `58e2542`
+- `templates/area-map.yaml` sample file added
+- `docs/USAGE-GUIDE.md` — Workflow 4 (History) + Workflow 5 (Git Diff) added; CLI reference updated; Limitations updated
+- `docs/V1-INPUT-TEMPLATE.md` — area-map.yaml schema documented
 
 ---
 

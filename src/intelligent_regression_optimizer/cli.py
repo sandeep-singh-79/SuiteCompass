@@ -137,7 +137,7 @@ def run(
                 sys.exit(EXIT_INPUT_ERROR)
             diff_text = diff_p.read_text(encoding="utf-8")
         else:
-            git_ref = ref or "HEAD~1"
+            git_ref = ref
             proc = subprocess.run(
                 ["git", "diff", "--name-only", git_ref],
                 capture_output=True,
@@ -163,6 +163,9 @@ def run(
     if result.exit_code == EXIT_VALIDATION_ERROR:
         click.echo(f"Validation error: {result.message}", err=True)
         sys.exit(EXIT_VALIDATION_ERROR)
+
+    for warning in result.warnings:
+        click.echo(f"Warning: {warning}", err=True)
 
     if output:
         Path(output).write_text(result.message, encoding="utf-8")
@@ -321,7 +324,7 @@ def import_tests(xlsx_file: str, output: str | None, sheet: str | None) -> None:
 @click.option("--diff-file", type=click.Path(), default=None,
               help="File containing 'git diff --name-only' output.")
 @click.option("--ref", type=str, default=None,
-              help="Git ref to diff against (runs 'git diff --name-only <ref>'). Default: HEAD~1.")
+              help="Git ref to diff against, e.g. HEAD~1. Runs 'git diff --name-only <ref>'. Required unless --diff-file is given.")
 def diff_areas(area_map: str, diff_file: str | None, ref: str | None) -> None:
     """Derive changed_areas from git diff and print a YAML fragment.
 
@@ -348,7 +351,7 @@ def diff_areas(area_map: str, diff_file: str | None, ref: str | None) -> None:
             sys.exit(EXIT_INPUT_ERROR)
         diff_text = diff_p.read_text(encoding="utf-8")
     else:
-        git_ref = ref or "HEAD~1"
+        git_ref = ref
         proc = subprocess.run(
             ["git", "diff", "--name-only", git_ref],
             capture_output=True,

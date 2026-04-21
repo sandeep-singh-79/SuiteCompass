@@ -27,9 +27,9 @@ Known unreachable/pre-existing lines that don't warrant tests:
 | A3 | merge_history() + pipeline wiring in end_to_end_flow.py | Complete — 15 new tests, end_to_end_flow 97% coverage |
 | A4 | --history-dir / --history-file CLI flags + benchmark | Complete — 10 new tests, cli.py 94% coverage |
 | A5 | Phase A hardening (coverage ≥ 90%, regression check) | Complete — 343 tests, 98.40% coverage, cli.py/history_loader.py at 100% |
-| B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Not started |
-| B2 | iro diff-areas subcommand + iro run integration | Not started |
-| B3 | Phase B hardening | Not started |
+| B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Complete — 35 tests, 100% coverage, commit 095bddc |
+| B2 | iro diff-areas subcommand + iro run integration | Complete — 394 tests (19 new), 97.18% coverage, commit 9fedd32 |
+| B3 | Phase B hardening | Complete — area-map.yaml template, USAGE-GUIDE Workflows 4+5, V1-INPUT-TEMPLATE area-map schema, commit 58e2542 |
 | C1 | LLM client infra copy-adapt from QEStrategyForge | Not started |
 | C2 | prompt_builder.py + prompts/v1/ templates | Not started |
 | C3 | llm_flow.py + repair/fallback + comparison.py | Not started |
