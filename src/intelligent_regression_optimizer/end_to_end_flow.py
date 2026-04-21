@@ -120,14 +120,15 @@ def run_pipeline(
     return _run_from_package(normalized)
 
 
-def run_pipeline_from_merged(data: dict[str, Any]) -> FlowResult:
+def run_pipeline_from_merged(
+    data: dict[str, Any],
+    history: dict[str, TestHistoryRecord] | None = None,
+) -> FlowResult:
     """Run the pipeline on an already-merged and validated input dict.
-
-    Used by the CLI merge utility when sprint context and test suite are
-    supplied as separate files.
 
     Args:
         data: A dict containing sprint_context, test_suite, and constraints.
+        history: Optional pre-loaded history mapping (test_id → record).
 
     Returns:
         :class:`FlowResult` with exit_code and the rendered markdown in
@@ -142,6 +143,9 @@ def run_pipeline_from_merged(data: dict[str, Any]) -> FlowResult:
         normalized = validate_raw(data)
     except InputValidationError as exc:
         return FlowResult(exit_code=EXIT_INPUT_ERROR, message=str(exc), output_path=None)
+
+    if history:
+        normalized, _ = merge_history(normalized, history)
 
     return _run_from_package(normalized)
 

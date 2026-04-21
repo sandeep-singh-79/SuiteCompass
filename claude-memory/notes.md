@@ -17,7 +17,7 @@ In-progress analysis, temporary notes, open questions, and working context for t
 | A1 | TestHistoryRecord model + history_loader.py (CSV/JSON) | Complete — 38 tests, 97%/98% coverage, V1-INPUT-TEMPLATE updated |
 | A2 | JUnit XML parser (junit_xml_parser.py, stdlib ElementTree) | Complete — 21 tests, 100% coverage, LEARNING-GUIDE updated |
 | A3 | merge_history() + pipeline wiring in end_to_end_flow.py | Complete — 15 new tests, end_to_end_flow 97% coverage |
-| A4 | --history-dir / --history-file CLI flags + benchmark | Not started |
+| A4 | --history-dir / --history-file CLI flags + benchmark | Complete — 10 new tests, cli.py 94% coverage |
 | A5 | Phase A hardening (coverage ≥ 90%, regression check) | Not started |
 | B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Not started |
 | B2 | iro diff-areas subcommand + iro run integration | Not started |

@@ -186,11 +186,15 @@ Run the optimisation pipeline on INPUT_FILE and print the report.
 
 Alternatively, supply a test suite and sprint context as separate files using `--tests` and `--sprint`.
 
+Supply `--history-dir` or `--history-file` to overlay CI-derived flakiness metrics onto the test suite before scoring.
+
 **Single-file mode:**
 
 | Option | Description |
 |---|---|
 | `--output, -o <path>` | Write report to file instead of stdout |
+| `--history-dir <path>` | Directory of JUnit XML files (one file per CI run); derives flakiness metrics automatically |
+| `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) with flakiness metrics |
 
 **Split-file mode (`--tests` + `--sprint`):**
 
@@ -199,12 +203,20 @@ Alternatively, supply a test suite and sprint context as separate files using `-
 | `--tests <path>` | Path to YAML file containing the `test_suite` block |
 | `--sprint <path>` | Path to YAML file containing `sprint_context` and `constraints` |
 | `--output, -o <path>` | Write report to file instead of stdout |
+| `--history-dir <path>` | Directory of JUnit XML files |
+| `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) |
+
+**History flag rules:**
+- `--history-dir` and `--history-file` are mutually exclusive.
+- When a test ID in history matches a test in the YAML, `flakiness_rate` is replaced by the history value; `failure_count_last_30d` and `total_runs` are added.
+- A `[history-override]` message is printed to stdout for each test where the YAML and history values differ.
+- Tests absent from history are left unchanged.
 
 | Exit Code | Meaning |
 |---|---|
 | 0 | Success — report generated |
 | 1 | Validation error — output contract violated (internal error) |
-| 2 | Input error — file not found, parse failure, or validation failure |
+| 2 | Input error — file not found, parse failure, validation failure, or bad history flag |
 
 ### `iro benchmark`
 

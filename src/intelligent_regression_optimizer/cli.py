@@ -12,7 +12,10 @@ import yaml
 from .benchmark_runner import run_assertions
 from .end_to_end_flow import run_pipeline, run_pipeline_from_merged
 from .excel_loader import ExcelLoaderError, load_excel
-from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR
+from .history_loader import load_history_csv, load_history_json
+from .junit_xml_parser import parse_junit_directory
+from .input_loader import InputValidationError
+from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
 
 
 @click.group()
@@ -27,11 +30,26 @@ def main() -> None:
               help="Path to test_suite YAML file (use with --sprint).")
 @click.option("--sprint", type=click.Path(), default=None,
               help="Path to sprint context YAML file (use with --tests).")
-def run(input_file: str | None, output: str | None, tests: str | None, sprint: str | None) -> None:
+@click.option("--history-dir", type=click.Path(), default=None,
+              help="Directory of JUnit XML files (one per CI run) to derive flakiness history.")
+@click.option("--history-file", type=click.Path(), default=None,
+              help="Pre-computed history file (.csv or .json) with flakiness metrics.")
+def run(
+    input_file: str | None,
+    output: str | None,
+    tests: str | None,
+    sprint: str | None,
+    history_dir: str | None,
+    history_file: str | None,
+) -> None:
     """Run the optimisation pipeline on INPUT_FILE and print the report.
 
     Alternatively, use --tests and --sprint to supply the test suite and
     sprint context as separate files. The tool merges them before running.
+
+    Supply --history-dir (directory of JUnit XML files) or --history-file
+    (pre-computed CSV/JSON) to overlay CI-derived flakiness metrics onto
+    the test_suite before scoring.
     """
     # Validate argument combinations
     if input_file and (tests or sprint):
@@ -46,11 +64,52 @@ def run(input_file: str | None, output: str | None, tests: str | None, sprint: s
         click.echo("Error: --tests and --sprint must be used together.", err=True)
         sys.exit(EXIT_INPUT_ERROR)
 
+    if history_dir and history_file:
+        click.echo("Error: --history-dir and --history-file are mutually exclusive.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Load history when requested
+    history: dict[str, TestHistoryRecord] | None = None
+    if history_dir is not None:
+        if not Path(history_dir).is_dir():
+            click.echo(f"Error: history directory not found: {history_dir!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        try:
+            history = parse_junit_directory(history_dir)
+        except InputValidationError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+
+    if history_file is not None:
+        hist_p = Path(history_file)
+        if not hist_p.exists():
+            click.echo(f"Error: history file not found: {history_file!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        suffix = hist_p.suffix.lower()
+        if suffix == ".csv":
+            try:
+                history = load_history_csv(history_file)
+            except InputValidationError as exc:
+                click.echo(f"Error: {exc}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+        elif suffix == ".json":
+            try:
+                history = load_history_json(history_file)
+            except InputValidationError as exc:
+                click.echo(f"Error: {exc}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+        else:
+            click.echo(
+                f"Error: --history-file must be a .csv or .json file, got {hist_p.name!r}",
+                err=True,
+            )
+            sys.exit(EXIT_INPUT_ERROR)
+
     if input_file:
-        result = run_pipeline(input_file)
+        result = run_pipeline(input_file, history=history)
     else:
-        # Merge mode
-        result = _run_merged(tests, sprint)  # type: ignore[arg-type]
+        # Merge mode — history applied inside run_pipeline_from_merged via separate helper
+        result = _run_merged(tests, sprint, history=history)  # type: ignore[arg-type]
 
     if result.exit_code == EXIT_INPUT_ERROR:
         click.echo(f"Error: {result.message}", err=True)
@@ -68,8 +127,9 @@ def run(input_file: str | None, output: str | None, tests: str | None, sprint: s
     sys.exit(EXIT_OK)
 
 
-def _run_merged(tests_path: str, sprint_path: str) -> Any:
+def _run_merged(tests_path: str, sprint_path: str, history: dict | None = None) -> Any:
     """Load two YAML files, merge them, and run the pipeline."""
+    from .end_to_end_flow import merge_history
     from .models import FlowResult
 
     tests_p = Path(tests_path)
@@ -134,7 +194,7 @@ def _run_merged(tests_path: str, sprint_path: str) -> Any:
         "constraints": sprint_data["constraints"],
     }
 
-    return run_pipeline_from_merged(merged)
+    return run_pipeline_from_merged(merged, history=history)
 
 
 @main.command()
