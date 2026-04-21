@@ -9,8 +9,9 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: V1-A and V1-B are implemented on `v1b-diff-mapper`, but review found critical and major follow-up gaps before full acceptance. A concrete remediation plan has been written to `plan.md` and is awaiting implementation confirmation.
+- Current stage: V1-A and V1-B fully implemented and remediated on `v1b-diff-mapper`. All 5 review-gap tracks (R1–R5) complete. 406 tests passing. Branch is acceptance-ready.
 - Active branch: `v1b-diff-mapper`.
+- Decision pending: merge `v1b-diff-mapper` to master, or start V1-C increment on a new branch first.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
@@ -144,9 +145,9 @@ Required labels (7, section-aware):
 - `Flakiness Tier High:` → Suite Health Summary
 
 ## Active Next Work
-- Execute the persisted V1-A / V1-B remediation plan in `plan.md` after explicit user confirmation.
-- Execution order is dependency-first: R1 diff-areas contract, R2 history override visibility, R3 timestamp reconciliation, R4 history benchmark, R5 docs catch-up.
-- Implementation has not started yet; current state is planning only.
+- All R1–R5 remediation tracks complete (committed 91495ab on v1b-diff-mapper).
+- Decision pending: merge v1b-diff-mapper to master, then start V1-C on a new branch.
+- V1-C scope (from plan.md Phase 5 backlog): multi-sprint trend scoring, confidence bands, tiered explanations — review plan.md before starting.
 
 ## Blockers
 - None.

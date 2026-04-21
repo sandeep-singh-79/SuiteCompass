@@ -13,7 +13,7 @@
 | Capability | intelligent-regression-optimizer |
 | Objective | MVP SEALED |
 | Current Phase | All phases (1 + 2 + 3) complete |
-| Current Focus | critical/major V1-A and V1-B review-gap remediation plan defined; awaiting implementation confirmation |
+| Current Focus | All R1–R5 remediation tracks COMPLETE. Branch v1b-diff-mapper is acceptance-ready. Next: decide whether to start V1-C or merge v1b-diff-mapper to master. |
 | Last Updated | 2026-04-21 |
 
 ---
@@ -28,11 +28,11 @@
 
 | Order | Track | Priority | Effort | Depends On | Status |
 |---|---|---|---|---|---|
-| R1 | diff-areas contract alignment | Critical | Small | None | Planned |
-| R2 | history override visibility | Critical | Small-Medium | None | Planned |
-| R3 | JUnit timestamp rule reconciliation | Critical | Medium | None | Planned |
-| R4 | V1-A history benchmark artifact | Major | Medium | R2, R3 | Planned |
-| R5 | README + supporting doc catch-up | Major | Small-Medium | R1, R3, R4 | Planned |
+| R1 | diff-areas contract alignment | Critical | Small | None | **Complete** |
+| R2 | history override visibility | Critical | Small-Medium | None | **Complete** |
+| R3 | JUnit timestamp rule reconciliation | Critical | Medium | None | **Complete** |
+| R4 | V1-A history benchmark artifact | Major | Medium | R2, R3 | **Complete** |
+| R5 | README + supporting doc catch-up | Major | Small-Medium | R1, R3, R4 | **Complete** |
 
 ### Track R1 - diff-areas Contract Alignment
 
