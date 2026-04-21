@@ -156,3 +156,23 @@ def map_files_to_areas(
             if fnmatch.fnmatch(file_path, mapping.pattern):
                 result.update(mapping.areas)
     return result
+
+
+def apply_area_map(normalized: dict, areas: set[str]) -> dict:
+    """Return a new normalized dict with every story's changed_areas replaced.
+
+    The derived *areas* set overwrites ``changed_areas`` on every story.
+    The original dict is not mutated.
+    """
+    areas_list = sorted(areas)
+    updated_stories = [
+        {**story, "changed_areas": areas_list}
+        for story in normalized.get("sprint_context", {}).get("stories", [])
+    ]
+    return {
+        **normalized,
+        "sprint_context": {
+            **normalized.get("sprint_context", {}),
+            "stories": updated_stories,
+        },
+    }

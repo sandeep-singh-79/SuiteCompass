@@ -186,3 +186,359 @@ Enable teams to feed their existing test inventory from spreadsheets instead of 
 | Jira | Auto-populate sprint_context.stories from sprint board | When adoption justifies API integration |
 | JUnit XML | Derive flakiness_rate and failure_count from historical test runs | When teams need automated enrichment |
 | TestRail / Zephyr | Direct test management system import | When specific TMS adoption is confirmed |
+
+---
+
+## v1.0 Implementation Plan
+
+### Objective
+
+Bring SuiteCompass from v0.3.x (deterministic core) to v1.0 by adding three capability layers:
+- V1-A: JUnit XML + test history ingestion
+- V1-B: Git diff → coverage area mapper
+- V1-C: LLM narrative layer
+
+### Phase Dependencies
+
+```
+V1-A (JUnit XML + History)    V1-B (Git Diff Mapper)   ← independent, parallel-safe
+        ↘                          ↙
+          V1-C (LLM Narrative)                          ← depends on both
+```
+
+---
+
+### Engineering Principles (mandatory, enforced per task)
+
+#### Code Quality
+- **SOLID** — apply where it helps clarity and testability; don't force abstraction for its own sake
+- **DRY** — extract shared logic only when duplication is real (≥2 occurrences), not speculative
+- **YAGNI** — implement only what the current slice needs; no speculative extension points
+- **KISS** — simple implementations first; design patterns only when complexity genuinely demands them
+- **Reuse-first** — extend existing modules before creating new ones; copy-adapt from QEStrategyForge where proven
+
+#### TDD Discipline (red → green → refactor)
+- Write failing test first; make it pass; refactor
+- Do not mark code complete until tested with reported pass/fail and coverage
+- Coverage ≥ 90% per module, measured after each sub-phase
+- Every sub-phase ends with: `pytest --tb=short -q` pass + coverage check
+
+#### Review Cycle (mandatory per sub-phase)
+- After each sub-phase is green: self-review the code for issues
+- Fix all issues found before proceeding to next sub-phase
+- Iterate review → fix until clean
+- Check: no dead code, no unused imports, no over-abstraction, no missing edge cases
+
+#### Documentation Discipline (mandatory per task)
+- Update docs when a task adds user-visible capability or changes behaviour
+- USAGE-GUIDE: update CLI reference, add new workflow sections
+- LEARNING-GUIDE: add domain explanation when new concepts are introduced
+- SCORING-FORMULA: update if score inputs change
+- BENCHMARK-AUTHORING: update if benchmark conventions change
+- V1-INPUT-TEMPLATE: update validation rules when input schema changes
+- README: update Development Status table and CLI table after each phase
+- Do not defer documentation — it ships with the code
+
+#### Inherited Practices (from QEStrategyForge, validated)
+- `from __future__ import annotations` at top of every module
+- Type hints on all function signatures
+- `@dataclass(slots=True)` for data structures
+- Path security: `Path.resolve()` + `is_relative_to(root)` for any user-supplied paths
+- Protocol-based client boundaries (typing.Protocol + @runtime_checkable) for LLM clients
+- Repo-local temp paths (`tmp/` gitignored), never OS temp dirs
+- API keys only from env vars, never config files
+- Error codes: 0=success, 1=IO error, 2=validation error, 3=generation error
+- Binary benchmark assertions only — pass/fail, no weighted scoring
+- Composition root in CLI; dependencies passed as arguments
+- Minimal external dependencies (stdlib + PyYAML + click + openpyxl)
+
+---
+
+### Phase V1-A: JUnit XML + Test History Ingestion
+
+**Goal:** Eliminate manual flakiness_rate / failure_count_last_30d entry.
+**Branch:** `v1a-test-history`
+**Decisions:** Both adapters — raw JUnit XML parser AND pre-computed summary (CSV/JSON).
+
+#### Sub-phase A1: TestHistoryRecord Model + History Loader
+
+**TDD targets:**
+1. Add `TestHistoryRecord` dataclass to `models.py`: test_id, flakiness_rate, failure_count_last_30d, total_runs, last_run_date (optional)
+2. Implement `history_loader.py`:
+   - `load_history_csv(path: str) -> dict[str, TestHistoryRecord]`
+   - `load_history_json(path: str) -> dict[str, TestHistoryRecord]`
+   - Validate schema: required columns, value ranges (0.0–1.0 for flakiness, non-negative int for failures)
+   - Raise `InputValidationError` on bad data
+3. Tests (~12): valid CSV, valid JSON, missing columns, out-of-range values, empty file, duplicate test_ids
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:** Update V1-INPUT-TEMPLATE — document pre-computed history format (CSV/JSON schema).
+
+#### Sub-phase A2: JUnit XML Parser
+
+**TDD targets:**
+1. Implement `junit_xml_parser.py`:
+   - `parse_junit_directory(dir_path: str) -> dict[str, TestHistoryRecord]`
+   - Support standard JUnit XML schema (surefire, pytest-junit)
+   - Parse N XML files: extract per-test pass/fail per run
+   - Compute flakiness heuristic: "failed in run N, passed in run N±1" = flaky occurrence
+   - `flakiness_rate = flaky_runs / total_runs`
+   - `failure_count_last_30d` from `<testcase>` timestamps (if available) or total failures across all files
+   - Use `xml.etree.ElementTree` (stdlib) — no lxml dependency
+2. Tests (~15): sample XML fixtures in `tests/fixtures/junit-xml/`, empty dir, malformed XML, no timestamp, single file, mixed pass/fail across runs, tests appearing in some files but not others
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:**
+- LEARNING-GUIDE: add subsection to "Reading Suite Health Signals" explaining how flakiness is computed from CI history (heuristic, limitations, manual override).
+- USAGE-GUIDE: document `--history-dir` workflow.
+
+#### Sub-phase A3: History Merge + Pipeline Wiring
+
+**TDD targets:**
+1. Add `merge_history()` to `input_loader.py`:
+   - `merge_history(normalized: dict, history: dict[str, TestHistoryRecord]) -> dict`
+   - For each test in test_suite: if history record exists, override flakiness_rate and failure_count_last_30d
+   - History wins over manual values (emit warning via logging)
+   - Tests with no history record keep manual values (or defaults)
+2. Wire into `end_to_end_flow.py`:
+   - Accept optional `history` parameter in `run_pipeline()` / `run_pipeline_from_merged()`
+   - Call `merge_history()` before `classify_context()` step
+3. Tests (~8): merge override logic, missing tests, manual vs history precedence, empty history dict, history with unknown test_ids (ignored)
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:** SCORING-FORMULA — add note that flakiness_rate can be history-derived or manual, with history taking precedence.
+
+#### Sub-phase A4: CLI Flags + Benchmark
+
+**TDD targets:**
+1. Add CLI flags to `iro run`:
+   - `--history-dir <path>` → calls `parse_junit_directory()`
+   - `--history-file <path>` → calls `load_history_csv()` or `load_history_json()` (detect by extension)
+   - Both optional; existing YAML-only path unchanged
+   - Mutual exclusion: cannot use both simultaneously
+2. Create benchmark: `benchmarks/with-history/` directory containing sample JUnit XML files + input YAML + assertions
+3. Tests (~8): CLI flag wiring, error messages for bad paths, mutual exclusion, end-to-end with history
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:**
+- USAGE-GUIDE: add Workflow 4 (CI History Import) — step-by-step for both XML and pre-computed paths.
+- README: update CLI table with new flags.
+- BENCHMARK-AUTHORING: add note about benchmarks that include history directories.
+
+#### Sub-phase A5: Phase A Hardening
+
+1. Coverage check: all new modules ≥ 90%
+2. Run all 3 existing benchmarks — must still pass unchanged (no regression)
+3. Run new history benchmark — must pass
+4. Review all A1–A4 code holistically: dead code, edge cases, error messages
+5. Fix any issues found. Iterate until clean.
+
+**Verification:**
+- `python -m pytest --tb=short -q` — all tests pass
+- `iro run benchmarks/high-risk-feature-sprint.input.yaml` — identical to v0.3.x output
+- `iro run benchmarks/high-risk-feature-sprint.input.yaml --history-dir benchmarks/with-history/` — output reflects history-derived values
+- All modules ≥ 90% coverage
+
+---
+
+### Phase V1-B: Git Diff → Coverage Area Mapper
+
+**Goal:** Derive changed_areas from git diff instead of manual declaration.
+**Branch:** `v1b-diff-mapper`
+**Decisions:** Lightweight git-diff mapper with config file. CI webhook backlogged.
+
+#### Sub-phase B1: Area Mapping Config + Mapper
+
+**TDD targets:**
+1. Define area mapping config format (`area-map.yaml`):
+   ```yaml
+   mappings:
+     - pattern: "src/payments/**"
+       areas: [PaymentService]
+     - pattern: "src/orders/**"
+       areas: [OrderFacade, OrderService]
+     - pattern: "tests/**"
+       areas: []   # test-only changes → no coverage area
+   ```
+2. Implement `diff_mapper.py`:
+   - `load_area_map(path: str) -> list[AreaMapping]` — validate config schema
+   - `parse_diff_output(text: str) -> list[str]` — extract file paths from `git diff --name-only` output
+   - `map_files_to_areas(files: list[str], mappings: list[AreaMapping]) -> set[str]` — apply fnmatch globs
+   - Use `fnmatch.fnmatch` (stdlib) for glob matching
+3. Tests (~12): various diff outputs, glob matching, no-match files, overlapping patterns, empty diff, malformed config, file in multiple patterns (union of areas)
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:** V1-INPUT-TEMPLATE — document `area-map.yaml` format and how changed_areas auto-derivation works.
+
+#### Sub-phase B2: CLI Subcommand + iro run Integration
+
+**TDD targets:**
+1. Add `iro diff-areas` subcommand:
+   - `--ref <git-ref>` (default: HEAD~1) — runs `git diff --name-only <ref>` via `subprocess`
+   - `--area-map <path>` — required config file
+   - `--diff-file <path>` — alternative: read pre-computed diff output from file (for CI piping)
+   - Output: YAML fragment `changed_areas: [Area1, Area2]` to stdout
+2. Optionally wire into `iro run`:
+   - `--area-map <path>` + `--ref <ref>` flags
+   - If provided, auto-derive changed_areas for all stories (override manual values)
+   - Stories still need manual `risk` and `dependency_stories`
+3. Tests (~10): subcommand output format, missing config, git not available (graceful error), diff-file mode, integration with iro run
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:**
+- USAGE-GUIDE: add Workflow 5 (Git Diff → Area Mapping) with step-by-step.
+- LEARNING-GUIDE: add subsection to "How Sprint Context Changes Test Selection" explaining how changed_areas can be auto-derived from SCM.
+- README: update CLI table with `diff-areas` subcommand and new flags.
+
+#### Sub-phase B3: Phase B Hardening
+
+1. Coverage check: all new modules ≥ 90%
+2. Run all existing benchmarks — no regression
+3. End-to-end test: `iro diff-areas` output piped into sprint YAML → `iro run` produces correct report
+4. Review B1–B2 code holistically. Fix issues. Iterate.
+5. Template `area-map.yaml` in `templates/` directory
+
+**Verification:**
+- All tests pass
+- `iro diff-areas --ref HEAD~1 --area-map templates/area-map.yaml` produces valid YAML
+- All modules ≥ 90% coverage
+
+---
+
+### Phase V1-C: LLM Narrative Layer
+
+**Goal:** Add LLM prose explanations to deterministic report. Default enhances report; `--summary-only` for executive summary.
+**Branch:** `v1c-llm-narrative`
+**Decisions:** Copy-adapt from QEStrategyForge. Deterministic fallback non-negotiable.
+
+#### Sub-phase C1: Client Infrastructure (copy-adapt)
+
+**TDD targets:**
+1. Copy-adapt from QEStrategyForge (rename env prefix to `SUITECOMPASS_LLM_*`):
+   - `llm_client.py` — LLMClient Protocol, GenerationRequest, GenerationResponse
+   - `ollama_client.py` — verbatim
+   - `openai_client.py` — verbatim
+   - `gemini_client.py` — verbatim
+   - `client_factory.py` — verbatim
+   - `config_loader.py` — adapt env prefix, default model
+2. Tests (~15): copy-adapt from QEStrategyForge test patterns. FakeLLMClient for structural tests. Config 4-layer resolution. Factory dispatch.
+
+**Review checkpoint:** verify copied code compiles, tests pass, no stale QEStrategyForge references.
+
+**Docs:** None needed yet (internal infrastructure).
+
+#### Sub-phase C2: Prompt Builder + Templates
+
+**TDD targets:**
+1. Implement `prompt_builder.py`:
+   - `build_prompt(normalized, classifications, tier_result, mode) -> str`
+   - `mode`: "enhanced" (prose per section) or "summary_only" (executive summary)
+   - Template-based: load from `prompts/v1/enhance.txt` and `prompts/v1/summary.txt`
+   - Prompt includes: sprint context summary, classification results, full tier lists with scores, override reasons, retire candidate rationale, budget overflow status, history provenance (manual vs CI-derived)
+2. Create prompt templates in `prompts/v1/`:
+   - `enhance.txt` — instructions for injecting prose explanations after each tier section
+   - `summary.txt` — instructions for standalone executive summary
+   - Both include output contract (required headings + labels) and no-invention guard
+3. Tests (~10): template rendering with all fields, missing optional fields, mode selection, prompt includes all required context
+
+**Review checkpoint:** code review after green. Fix issues. Iterate.
+
+**Docs:** None yet (prompts are internal).
+
+#### Sub-phase C3: LLM Flow + Repair + Fallback
+
+**TDD targets:**
+1. Implement `llm_flow.py`:
+   - `run_llm_pipeline(input_path, llm_client, config, mode) -> FlowResult`
+   - Pipeline: load → classify → score → render (deterministic) → build prompt → call LLM → validate → repair → fallback
+   - Repair: inject missing headings/labels from deterministic output (structural only, no content synthesis)
+   - Fallback: return deterministic output on any LLM failure (exit code 0, not 3)
+   - For `summary_only`: LLM produces executive summary, prepended before deterministic report
+2. Copy-adapt `comparison.py` from QEStrategyForge — deterministic vs LLM side-by-side
+3. Tests (~20): FakeLLMClient happy path, partial output → repair, total failure → deterministic fallback, summary-only mode, comparison output format
+
+**Review checkpoint:** code review. Verify fallback chain fires correctly. Fix issues. Iterate.
+
+**Docs:** SCORING-FORMULA — add note that LLM narrative does not alter scores or tier assignments (it explains them).
+
+#### Sub-phase C4: CLI Flags + Live Testing
+
+**TDD targets:**
+1. Add CLI flags to `iro run`:
+   - `--mode deterministic|llm_assisted` (default: deterministic)
+   - `--provider ollama|openai|gemini` (required when mode=llm_assisted)
+   - `--model <name>`
+   - `--summary-only` (only with mode=llm_assisted)
+   - `--compare <output.md>` (side-by-side comparison)
+2. Wire composition root: CLI resolves config → creates client → calls `run_llm_pipeline()`
+3. Tests (~8): CLI flag wiring, mode validation, missing provider error, deterministic mode unchanged
+4. Live tests (marked `@pytest.mark.live`, excluded by default): Ollama smoke test with real model
+
+**Review checkpoint:** end-to-end with Ollama. Fix issues. Iterate.
+
+**Docs:**
+- USAGE-GUIDE: add Workflow 6 (LLM-Enhanced Report) — step-by-step, provider setup, summary-only mode, comparison mode.
+- LEARNING-GUIDE: add section "How to Read an LLM-Enhanced Report" — what the narrative adds, why deterministic scores are still authoritative, how fallback works.
+- README: update CLI table with `--mode`, `--provider`, `--model`, `--summary-only`, `--compare` flags.
+
+#### Sub-phase C5: Phase C Hardening
+
+1. Coverage check: all new modules ≥ 90%
+2. All existing benchmarks pass unchanged (deterministic path untouched)
+3. LLM benchmark: `benchmarks/llm-enhanced-high-risk.assertions.yaml` with narrative presence assertions
+4. Kill LLM mid-request → verify deterministic fallback fires, valid output produced
+5. Review all C1–C4 code holistically. Fix issues. Iterate.
+
+**Verification:**
+- All tests pass
+- `iro run input.yaml --mode deterministic` — identical to v0.3.x
+- `iro run input.yaml --mode llm_assisted --provider ollama` — enhanced report with prose
+- `iro run input.yaml --mode llm_assisted --summary-only` — exec summary + original report
+- All modules ≥ 90% coverage
+
+---
+
+### Final Phase: v1.0 Seal
+
+1. Update pyproject.toml version to 1.0.0
+2. Update README Development Status (test count, coverage, phase summary)
+3. Update PHASED-IMPLEMENTATION with V1-A, V1-B, V1-C retrospective
+4. Full test suite pass + all benchmarks green
+5. Tag `v1.0.0` on master
+6. Update program-level memory
+
+---
+
+### Scope Boundaries
+
+**Included:**
+- JUnit XML parser (surefire + pytest-junit), pre-computed CSV/JSON history
+- Git diff → coverage area glob mapper with config file
+- 3-provider LLM (ollama, openai, gemini) with narrative injection + executive summary
+- Deterministic fallback on all LLM failures
+- All existing v0.3.x behaviour preserved unchanged
+- Documentation updated per task
+
+**Excluded (backlogged):**
+- CI webhook listener (future, after V1-B proves mapping)
+- Multi-hop dependency traversal
+- Fuzzy coverage_areas matching
+- PyPI publish
+- Configurable scoring weights
+- Karpathy optimization loop for SuiteCompass prompts
+- AST-level / method-level change detection
+
+### Estimated New Tests
+
+| Phase | New Tests | Cumulative |
+|---|---|---|
+| V1-A (5 sub-phases) | ~43 | ~291 |
+| V1-B (3 sub-phases) | ~22 | ~313 |
+| V1-C (5 sub-phases) | ~53 | ~366 |
+| Total | ~118 | ~366 |

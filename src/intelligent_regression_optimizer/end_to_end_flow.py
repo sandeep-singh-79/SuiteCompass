@@ -85,6 +85,7 @@ def merge_history(
 def run_pipeline(
     input_path: str,
     history: dict[str, TestHistoryRecord] | None = None,
+    changed_areas: set[str] | None = None,
 ) -> FlowResult:
     """Run the full deterministic pipeline on *input_path*.
 
@@ -117,12 +118,18 @@ def run_pipeline(
     if history:
         normalized, _ = merge_history(normalized, history)
 
+    # 3. Override changed_areas when derived from diff
+    if changed_areas is not None:
+        from intelligent_regression_optimizer.diff_mapper import apply_area_map
+        normalized = apply_area_map(normalized, changed_areas)
+
     return _run_from_package(normalized)
 
 
 def run_pipeline_from_merged(
     data: dict[str, Any],
     history: dict[str, TestHistoryRecord] | None = None,
+    changed_areas: set[str] | None = None,
 ) -> FlowResult:
     """Run the pipeline on an already-merged and validated input dict.
 
@@ -146,6 +153,10 @@ def run_pipeline_from_merged(
 
     if history:
         normalized, _ = merge_history(normalized, history)
+
+    if changed_areas is not None:
+        from intelligent_regression_optimizer.diff_mapper import apply_area_map
+        normalized = apply_area_map(normalized, changed_areas)
 
     return _run_from_package(normalized)
 

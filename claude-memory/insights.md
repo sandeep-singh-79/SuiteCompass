@@ -39,3 +39,13 @@ Reusable lessons and engineering rules for the `intelligent-regression-optimizer
 
 15. **Integration tests must cover the full escape path chain.** Unit tests on each module cannot catch coupling defects between classifier → rules → renderer → validator. A dedicated integration test file covering cross-module invariants is necessary.
 
+16. **TDD is a hard constraint, not a style preference.** Writing the implementation before the test is a debt that compounds immediately. In this codebase: red → green → refactor, no exceptions. A sub-phase is not green until `pytest --tb=short -q` passes and coverage is reported.
+
+17. **Review cycles prevent compounding debt better than end-of-phase cleanup.** A self-review after every sub-phase (dead code, edge cases, unused imports, over-abstraction) costs less than fixing accumulated issues after three sub-phases. Enforce it before moving to the next slice.
+
+18. **Documentation deferred is documentation forgotten.** Shipping docs with the code that introduces the capability is the only reliable strategy. Retrospective documentation misses edge cases the implementer can still recall. Rule: if a task adds a CLI flag, a workflow, or a schema change — the affected doc file is updated in the same task.
+
+19. **Copy-adapt over rebuild.** When QEStrategyForge has a proven module (LLM clients, config loader, client factory, benchmark runner), copy it and adapt the env prefix / domain names. Rebuilding from scratch introduces new bugs without adding new skills. The reuse decision is the default; divergence from QEStrategyForge requires a written reason.
+
+20. **Coverage ≥ 90% per module is a module-level gate, not an aggregate.** A 95% project average can hide an 0%-covered new module. Measure coverage per module after each sub-phase and block progression if any module is below threshold.
+

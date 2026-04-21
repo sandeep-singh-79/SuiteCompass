@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ import click
 import yaml
 
 from .benchmark_runner import run_assertions
+from .diff_mapper import apply_area_map, load_area_map, map_files_to_areas, parse_diff_output
 from .end_to_end_flow import run_pipeline, run_pipeline_from_merged
 from .excel_loader import ExcelLoaderError, load_excel
 from .history_loader import load_history_csv, load_history_json
@@ -34,6 +36,12 @@ def main() -> None:
               help="Directory of JUnit XML files (one per CI run) to derive flakiness history.")
 @click.option("--history-file", type=click.Path(), default=None,
               help="Pre-computed history file (.csv or .json) with flakiness metrics.")
+@click.option("--area-map", type=click.Path(), default=None,
+              help="area-map.yaml config for deriving changed_areas from git diff.")
+@click.option("--diff-file", type=click.Path(), default=None,
+              help="File containing 'git diff --name-only' output (use with --area-map).")
+@click.option("--ref", type=str, default=None,
+              help="Git ref to diff against (default HEAD~1, use with --area-map).")
 def run(
     input_file: str | None,
     output: str | None,
@@ -41,15 +49,20 @@ def run(
     sprint: str | None,
     history_dir: str | None,
     history_file: str | None,
+    area_map: str | None,
+    diff_file: str | None,
+    ref: str | None,
 ) -> None:
     """Run the optimisation pipeline on INPUT_FILE and print the report.
 
     Alternatively, use --tests and --sprint to supply the test suite and
     sprint context as separate files. The tool merges them before running.
 
-    Supply --history-dir (directory of JUnit XML files) or --history-file
-    (pre-computed CSV/JSON) to overlay CI-derived flakiness metrics onto
-    the test_suite before scoring.
+    Supply --history-dir or --history-file to overlay CI-derived flakiness
+    metrics onto the test_suite before scoring.
+
+    Supply --area-map with --diff-file or --ref to auto-derive changed_areas
+    for all stories from git diff output.
     """
     # Validate argument combinations
     if input_file and (tests or sprint):
@@ -62,6 +75,14 @@ def run(
 
     if history_dir and history_file:
         click.echo("Error: --history-dir and --history-file are mutually exclusive.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if area_map and not (diff_file or ref):
+        click.echo("Error: --area-map requires --diff-file or --ref.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if diff_file and ref:
+        click.echo("Error: --diff-file and --ref are mutually exclusive.", err=True)
         sys.exit(EXIT_INPUT_ERROR)
 
     # Load history when requested
@@ -101,11 +122,39 @@ def run(
             )
             sys.exit(EXIT_INPUT_ERROR)
 
+    # Resolve area map → changed_areas set (CLI layer owns git/file I/O)
+    changed_areas: set[str] | None = None
+    if area_map is not None:
+        try:
+            mappings = load_area_map(area_map)
+        except InputValidationError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        if diff_file:
+            diff_p = Path(diff_file)
+            if not diff_p.exists():
+                click.echo(f"Error: diff file not found: {diff_file!r}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+            diff_text = diff_p.read_text(encoding="utf-8")
+        else:
+            git_ref = ref or "HEAD~1"
+            proc = subprocess.run(
+                ["git", "diff", "--name-only", git_ref],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode != 0:
+                click.echo(f"Error: git diff failed (exit {proc.returncode})", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+            diff_text = proc.stdout
+        files = parse_diff_output(diff_text)
+        changed_areas = map_files_to_areas(files, mappings)
+
     if input_file:
-        result = run_pipeline(input_file, history=history)
+        result = run_pipeline(input_file, history=history, changed_areas=changed_areas)
     else:
         # Merge mode — history applied inside run_pipeline_from_merged via separate helper
-        result = _run_merged(tests, sprint, history=history)  # type: ignore[arg-type]
+        result = _run_merged(tests, sprint, history=history, changed_areas=changed_areas)  # type: ignore[arg-type]
 
     if result.exit_code == EXIT_INPUT_ERROR:
         click.echo(f"Error: {result.message}", err=True)
@@ -123,7 +172,12 @@ def run(
     sys.exit(EXIT_OK)
 
 
-def _run_merged(tests_path: str, sprint_path: str, history: dict | None = None) -> Any:
+def _run_merged(
+    tests_path: str,
+    sprint_path: str,
+    history: dict | None = None,
+    changed_areas: set | None = None,
+) -> Any:
     """Load two YAML files, merge them, and run the pipeline."""
     from .end_to_end_flow import merge_history
     from .models import FlowResult
@@ -190,7 +244,7 @@ def _run_merged(tests_path: str, sprint_path: str, history: dict | None = None) 
         "constraints": sprint_data["constraints"],
     }
 
-    return run_pipeline_from_merged(merged, history=history)
+    return run_pipeline_from_merged(merged, history=history, changed_areas=changed_areas)
 
 
 @main.command()
@@ -260,3 +314,58 @@ def import_tests(xlsx_file: str, output: str | None, sheet: str | None) -> None:
 
     sys.exit(EXIT_OK)
 
+
+@main.command("diff-areas")
+@click.option("--area-map", required=True, type=click.Path(),
+              help="area-map.yaml config mapping glob patterns to coverage areas.")
+@click.option("--diff-file", type=click.Path(), default=None,
+              help="File containing 'git diff --name-only' output.")
+@click.option("--ref", type=str, default=None,
+              help="Git ref to diff against (runs 'git diff --name-only <ref>'). Default: HEAD~1.")
+def diff_areas(area_map: str, diff_file: str | None, ref: str | None) -> None:
+    """Derive changed_areas from git diff and print a YAML fragment.
+
+    Output: 'changed_areas: [Area1, Area2]' — paste into sprint_context.stories.
+    """
+    if diff_file and ref:
+        click.echo("Error: --diff-file and --ref are mutually exclusive.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if not diff_file and not ref:
+        click.echo("Error: provide --diff-file or --ref.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    try:
+        mappings = load_area_map(area_map)
+    except InputValidationError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if diff_file:
+        diff_p = Path(diff_file)
+        if not diff_p.exists():
+            click.echo(f"Error: diff file not found: {diff_file!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        diff_text = diff_p.read_text(encoding="utf-8")
+    else:
+        git_ref = ref or "HEAD~1"
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", git_ref],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            click.echo(f"Error: git diff failed (exit {proc.returncode})", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        diff_text = proc.stdout
+
+    files = parse_diff_output(diff_text)
+    areas = map_files_to_areas(files, mappings)
+    fragment = yaml.dump(
+        {"changed_areas": sorted(areas)},
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
+    )
+    click.echo(fragment, nl=False)
+    sys.exit(EXIT_OK)

@@ -9,8 +9,50 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: Phase 1 deterministic core COMPLETE. Phase 3 Excel adapter (all tracks A1-A6) COMPLETE. Phase 2 documentation COMPLETE.
-- Active branch: `docs-fix-review-gaps` pushed and complete. Branch `master` is next merge target.
+- Current stage: v0.3.1 SEALED (248 tests, 97.7% coverage). Phase 1 deterministic core + Phase 3 Excel adapter + Phase 2 documentation — all complete. v1.0 plan designed and written to `plan.md`. **Next action: begin V1-A sub-phase A1** (TestHistoryRecord model + history_loader.py) on branch `v1a-test-history`.
+- Active branch: `master` is the sealed base. New work on `v1a-test-history`.
+
+## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
+
+### Code Quality Rules
+- **SOLID** — apply where it aids clarity and testability; never force abstraction speculatively
+- **DRY** — extract shared logic only when duplication is real (≥2 actual occurrences)
+- **YAGNI** — implement only what the current sub-phase needs; no extension points for hypothetical future use
+- **KISS** — simple implementation first; introduce patterns only when complexity genuinely demands them
+- **Reuse-first** — extend existing modules before creating new ones; copy-adapt from QEStrategyForge over rebuilding from scratch
+
+### TDD Discipline (NON-NEGOTIABLE)
+- Write failing test FIRST. Make it pass. Refactor. Never in any other order.
+- Do not mark a sub-phase complete until `pytest --tb=short -q` passes and coverage is reported
+- Coverage ≥ 90% per module — measured after each sub-phase, not deferred to hardening
+- Code is not complete until tested with pass/fail evidence and coverage numbers in the session
+
+### Review Cycle (MANDATORY after each sub-phase)
+- Self-review all code while it is green: dead code, unused imports, over-abstraction, missing edge cases
+- Fix all issues found before starting the next sub-phase
+- Iterate review → fix until clean. There is no partial green.
+
+### Documentation Discipline (ships with code — NO DEFERRAL)
+- Update docs in the same task that adds user-visible capability or changes behaviour
+- USAGE-GUIDE: update CLI reference, add new workflow sections
+- LEARNING-GUIDE: add domain explanation for new concepts introduced
+- SCORING-FORMULA: update whenever score inputs change
+- V1-INPUT-TEMPLATE: update validation rules when input schema changes
+- README: update Development Status and CLI table after each phase seal
+- BENCHMARK-AUTHORING: update if benchmark conventions change
+
+### Inherited Practices (from QEStrategyForge — verified, apply unchanged)
+- `from __future__ import annotations` at top of every new module
+- Type hints on all function signatures
+- `@dataclass(slots=True)` for all data structures
+- Path security: `Path.resolve()` + `is_relative_to(root)` for any user-supplied paths
+- Protocol-based LLM client boundaries: `typing.Protocol` + `@runtime_checkable`
+- Repo-local temp paths (`tmp/` gitignored); OS temp dirs are FORBIDDEN
+- API keys from env vars ONLY — never from config files or defaults
+- Error codes: 0=success, 1=IO error, 2=validation error, 3=generation error
+- Binary benchmark assertions only (pass/fail); no weighted or partial scoring
+- Composition root in CLI; inject dependencies as arguments — no module-level globals
+- Minimal external dependencies: stdlib + PyYAML + click + openpyxl (add nothing without explicit decision)
 
 ## Decisions Made
 
