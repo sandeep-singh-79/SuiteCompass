@@ -237,3 +237,46 @@ A JSON array of objects. Each object must have the same required fields as the C
 - File not found raises a validation error
 - History values take precedence over manual YAML values (a warning is logged)
 - Tests with no history record keep their manual YAML values unchanged
+
+---
+
+## Area-Map Config (V1-B)
+
+Instead of writing `changed_areas` manually in each story, supply an `area-map.yaml` file and a git diff source. The tool derives the area set automatically and overrides `changed_areas` on every story.
+
+See `templates/area-map.yaml` for a ready-to-copy example.
+
+### area-map.yaml schema
+
+```yaml
+mappings:         # Required — list of one or more mapping rules
+  - pattern: "src/payments/**"   # Required — fnmatch glob; ** crosses directories
+    areas:                        # Required — list of area names to emit on match
+      - Payments
+  - pattern: "src/checkout/**"
+    areas:
+      - Checkout
+      - Payments
+  - pattern: "tests/**"
+    areas: []     # Empty list = this pattern matches but adds no areas
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `mappings` | list | Yes | One or more mapping rules |
+| `mappings[].pattern` | string | Yes | fnmatch glob pattern matched against each changed file path |
+| `mappings[].areas` | list[string] | Yes | Area names to union-merge when the pattern matches |
+
+### Behaviour
+
+- A file may match multiple patterns — all matching `areas` lists are unioned.
+- Patterns use `fnmatch.fnmatch`; `**` matches any sequence of characters including `/`.
+- An empty `areas` list on a matching pattern is valid and contributes nothing to the union.
+- If no file matches any pattern, the result is an empty set — `changed_areas` becomes `[]` on all stories.
+- Area names are plain strings; they must match the values used in `test_suite[].coverage_areas` exactly.
+
+### Validation rules
+
+- `mappings` must be a list with at least one entry
+- Each entry must have `pattern` (non-empty string) and `areas` (list, may be empty)
+- Unknown top-level keys raise a validation error

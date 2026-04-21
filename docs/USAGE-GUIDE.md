@@ -173,6 +173,114 @@ Note: `sprint.yaml` must contain `sprint_context` and `constraints` but does **n
 
 ---
 
+## Workflow 4: CI History Overlay
+
+Augment the optimiser's flakiness scoring with real test history from your CI system.
+
+### Step 1 — Collect JUnit XML reports
+
+Point `--history-dir` at a folder of JUnit XML files (one file per CI run):
+
+```bash
+iro run input.yaml --history-dir ./ci-reports/
+```
+
+Or supply a pre-computed CSV/JSON file:
+
+```bash
+iro run input.yaml --history-file ./flakiness.csv
+```
+
+### History file formats
+
+**CSV** (`.csv`):
+
+```csv
+test_id,flakiness_rate,failure_count_last_30d,total_runs
+TEST-001,0.12,3,25
+TEST-002,0.05,1,20
+```
+
+**JSON** (`.json`) — map of `test_id → record`:
+
+```json
+{
+  "TEST-001": {"flakiness_rate": 0.12, "failure_count_last_30d": 3, "total_runs": 25}
+}
+```
+
+When a test ID in history matches a test in the input, `flakiness_rate` is overridden with the history value and `failure_count_last_30d` / `total_runs` are added. Tests absent from history are left unchanged.
+
+---
+
+## Workflow 5: Git Diff → Area Mapping
+
+Automatically derive `changed_areas` from a git diff instead of writing them by hand.
+
+### When to use
+
+- You have a YAML input where `changed_areas` reflects what the diff changed — not what was planned
+- Your team commits to a `main`/`develop` branch and wants CI to derive areas automatically
+
+### Step 1 — Create area-map.yaml
+
+Copy `templates/area-map.yaml` and edit it to match your project layout:
+
+```yaml
+mappings:
+  - pattern: "src/payments/**"
+    areas:
+      - Payments
+  - pattern: "src/checkout/**"
+    areas:
+      - Checkout
+      - Payments
+  - pattern: "tests/**"
+    areas: []        # test-only changes add no coverage areas
+```
+
+Each `pattern` is a glob matched via `fnmatch` — `**` crosses directory boundaries. A file may match multiple patterns; all matching `areas` are unioned.
+
+### Step 2 — Preview the derived areas
+
+```bash
+# From a diff file (git diff --name-only output)
+git diff --name-only HEAD~1 > changed-files.txt
+iro diff-areas --area-map area-map.yaml --diff-file changed-files.txt
+
+# Or directly from a git ref
+iro diff-areas --area-map area-map.yaml --ref HEAD~1
+```
+
+Output (YAML fragment, paste into sprint_context.stories):
+
+```yaml
+changed_areas:
+- Checkout
+- Payments
+```
+
+### Step 3 — Run with area-map override
+
+```bash
+# Override changed_areas in the input using git diff
+iro run input.yaml --area-map area-map.yaml --ref HEAD~1
+
+# Or from a saved diff file
+iro run input.yaml --area-map area-map.yaml --diff-file changed-files.txt
+```
+
+The `--area-map` flag replaces `changed_areas` on **every story** in the input with the set derived from the diff. This is intended for single-story or single-PR workflows where one diff maps cleanly to the sprint scope.
+
+### Rules
+
+- `--area-map` requires exactly one of `--diff-file` or `--ref` (mutually exclusive)
+- `--diff-file` must point to an existing file
+- `--ref` is passed directly to `git diff --name-only <ref>`; defaults to `HEAD~1` when not specified
+- The tool must be run from within the repository root (or any sub-directory) for `--ref` to work
+
+---
+
 ## CLI Reference
 
 ### `iro run`
@@ -188,6 +296,8 @@ Alternatively, supply a test suite and sprint context as separate files using `-
 
 Supply `--history-dir` or `--history-file` to overlay CI-derived flakiness metrics onto the test suite before scoring.
 
+Supply `--area-map` with `--diff-file` or `--ref` to auto-derive `changed_areas` from a git diff.
+
 **Single-file mode:**
 
 | Option | Description |
@@ -195,6 +305,9 @@ Supply `--history-dir` or `--history-file` to overlay CI-derived flakiness metri
 | `--output, -o <path>` | Write report to file instead of stdout |
 | `--history-dir <path>` | Directory of JUnit XML files (one file per CI run); derives flakiness metrics automatically |
 | `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) with flakiness metrics |
+| `--area-map <path>` | area-map.yaml config; requires `--diff-file` or `--ref` |
+| `--diff-file <path>` | File containing `git diff --name-only` output |
+| `--ref <git-ref>` | Git ref to diff against (runs `git diff --name-only <ref>`) |
 
 **Split-file mode (`--tests` + `--sprint`):**
 
@@ -205,6 +318,9 @@ Supply `--history-dir` or `--history-file` to overlay CI-derived flakiness metri
 | `--output, -o <path>` | Write report to file instead of stdout |
 | `--history-dir <path>` | Directory of JUnit XML files |
 | `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) |
+| `--area-map <path>` | area-map.yaml config; requires `--diff-file` or `--ref` |
+| `--diff-file <path>` | File containing `git diff --name-only` output |
+| `--ref <git-ref>` | Git ref to diff against |
 
 **History flag rules:**
 - `--history-dir` and `--history-file` are mutually exclusive.
@@ -212,11 +328,43 @@ Supply `--history-dir` or `--history-file` to overlay CI-derived flakiness metri
 - A `[history-override]` message is printed to stdout for each test where the YAML and history values differ.
 - Tests absent from history are left unchanged.
 
+**Area-map flag rules:**
+- `--area-map` requires exactly one of `--diff-file` or `--ref`.
+- `--diff-file` and `--ref` are mutually exclusive.
+- If `--ref` is given, `git diff --name-only <ref>` is run from the current working directory.
+
 | Exit Code | Meaning |
 |---|---|
 | 0 | Success — report generated |
 | 1 | Validation error — output contract violated (internal error) |
-| 2 | Input error — file not found, parse failure, validation failure, or bad history flag |
+| 2 | Input error — file not found, parse failure, validation failure, or bad flag combination |
+
+### `iro diff-areas`
+
+```
+Usage: iro diff-areas --area-map AREA_MAP (--diff-file FILE | --ref GIT_REF)
+```
+
+Derive `changed_areas` from a git diff and print a YAML fragment.
+
+| Option | Required | Description |
+|---|---|---|
+| `--area-map <path>` | Yes | area-map.yaml config mapping glob patterns to coverage area names |
+| `--diff-file <path>` | One of | File containing `git diff --name-only` output |
+| `--ref <git-ref>` | One of | Git ref; runs `git diff --name-only <ref>` |
+
+Output example:
+
+```yaml
+changed_areas:
+- Checkout
+- Payments
+```
+
+| Exit Code | Meaning |
+|---|---|
+| 0 | Success — YAML fragment printed |
+| 2 | Input error — bad area-map, missing diff file, git failure, or bad flag combination |
 
 ### `iro benchmark`
 
@@ -352,6 +500,6 @@ See [VALIDATION-HARNESS](VALIDATION-HARNESS.md) for how to add new benchmark sce
 - **No fuzzy area matching** — `coverage_areas` matched by exact string equality
 - **1-hop dependencies only** — transitive dependency chains not followed
 - **No multi-sprint history** — operates on a single sprint snapshot
-- **No SCM integration** — `changed_areas` must be provided manually
+- **Single-diff area override** — `--area-map` replaces `changed_areas` on all stories; per-story diff mapping is not supported
 - **No Jira/TestRail connector** — sprint context must be written by hand or imported via Excel
 - **Story `type` not scored** — carried in input for future use only
