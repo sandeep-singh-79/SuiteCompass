@@ -70,3 +70,19 @@ class FlowResult:
     exit_code: int
     message: str
     output_path: str | None
+
+
+# ---------------------------------------------------------------------------
+# V1-A: Test history data structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class TestHistoryRecord:
+    """Per-test metrics derived from CI history or a pre-computed summary file."""
+
+    test_id: str
+    flakiness_rate: float
+    failure_count_last_30d: int
+    total_runs: int
+    last_run_date: str | None = None

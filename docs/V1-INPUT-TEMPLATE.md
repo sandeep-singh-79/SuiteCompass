@@ -187,3 +187,53 @@ The input loader (`input_loader.py`) enforces these binary checks:
 - `dependency_stories` IDs must reference stories defined in the same `sprint_context`
 - `test_suite` must be a list (may be empty; an empty suite produces no recommendations)
 - `mandatory_tags` must be a list
+
+---
+
+## Pre-Computed Test History (V1-A)
+
+Instead of entering `flakiness_rate` and `failure_count_last_30d` manually in your YAML, you can supply a pre-computed history file. When provided via `--history-file`, the loader overwrites the manual values for any test whose `id` appears in the history file. Tests not in the history file keep their manual values.
+
+### CSV Format
+
+One row per test. Column order does not matter.
+
+| Column | Type | Required | Description |
+|---|---|---|---|
+| `test_id` | string | Yes | Must match the `id` field in `test_suite` |
+| `flakiness_rate` | float 0.0–1.0 | Yes | Fraction of runs where the test was flaky |
+| `failure_count_last_30d` | integer ≥ 0 | Yes | Total failures in the last 30 days |
+| `total_runs` | integer ≥ 0 | Yes | Total runs in the history window |
+| `last_run_date` | string (any date format) | No | Date of most recent run; informational only |
+
+Example:
+
+```csv
+test_id,flakiness_rate,failure_count_last_30d,total_runs,last_run_date
+T-001,0.05,2,40,2026-04-18
+T-002,0.0,0,40,2026-04-18
+T-003,0.30,12,40,2026-04-17
+```
+
+### JSON Format
+
+A JSON array of objects. Each object must have the same required fields as the CSV columns above.
+
+```json
+[
+  {"test_id": "T-001", "flakiness_rate": 0.05, "failure_count_last_30d": 2, "total_runs": 40, "last_run_date": "2026-04-18"},
+  {"test_id": "T-002", "flakiness_rate": 0.0,  "failure_count_last_30d": 0, "total_runs": 40},
+  {"test_id": "T-003", "flakiness_rate": 0.30, "failure_count_last_30d": 12, "total_runs": 40}
+]
+```
+
+### History Validation Rules
+
+- `test_id` is required in every record
+- `flakiness_rate` must be a number between 0.0 and 1.0 (inclusive)
+- `failure_count_last_30d` must be a non-negative integer
+- `total_runs` must be a non-negative integer
+- Duplicate `test_id` values in the same file raise a validation error
+- File not found raises a validation error
+- History values take precedence over manual YAML values (a warning is logged)
+- Tests with no history record keep their manual YAML values unchanged
