@@ -8,20 +8,37 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ---
 
 ## Open Questions
-- None. MVP sealed.
+- None at session start.
 
-## Backlogged Items (not planned)
-- Real JUnit XML ingestion
-- Fuzzy / hierarchical coverage_areas matching
-- SCM integration (git diff → changed_areas)
-- Jira auto-populate sprint_context.stories
-- LLM narrative layer
-- Story `type`-based scoring
+## v1.0 Active Phase Tracker
+
+| Sub-phase | Description | Status |
+|---|---|---|
+| A1 | TestHistoryRecord model + history_loader.py (CSV/JSON) | Complete — 38 tests, 97%/98% coverage, V1-INPUT-TEMPLATE updated |
+| A2 | JUnit XML parser (junit_xml_parser.py, stdlib ElementTree) | Complete — 21 tests, 100% coverage, LEARNING-GUIDE updated |
+| A3 | merge_history() + pipeline wiring in end_to_end_flow.py | Complete — 15 new tests, end_to_end_flow 97% coverage |
+| A4 | --history-dir / --history-file CLI flags + benchmark | Not started |
+| A5 | Phase A hardening (coverage ≥ 90%, regression check) | Not started |
+| B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Not started |
+| B2 | iro diff-areas subcommand + iro run integration | Not started |
+| B3 | Phase B hardening | Not started |
+| C1 | LLM client infra copy-adapt from QEStrategyForge | Not started |
+| C2 | prompt_builder.py + prompts/v1/ templates | Not started |
+| C3 | llm_flow.py + repair/fallback + comparison.py | Not started |
+| C4 | --mode / --provider / --model CLI flags + live tests | Not started |
+| C5 | Phase C hardening + LLM benchmark | Not started |
+| Seal | Version 1.0.0 bump, README, PHASED-IMPLEMENTATION retro, tag | Not started |
+
+## v1.0 Backlogged Items (not in scope for v1.0)
+- CI webhook listener (after V1-B proves file-level mapping)
 - Multi-hop dependency traversal
-- CI pipeline (GitHub Actions)
+- Fuzzy coverage_areas matching
 - PyPI publish
-
-These are permanently deferred unless the program revisits this capability.
+- Configurable scoring weights
+- Karpathy optimization loop for SuiteCompass prompts
+- AST-level / method-level change detection
+- Jira auto-populate sprint_context.stories
+- Story `type`-based scoring (carried forward, zero scoring impact through v1.0)
 
 ## Working Notes
 - CLI entry point: `iro` via pyproject.toml scripts. Subcommands: `run <input.yaml>`, `run --tests <t.yaml> --sprint <s.yaml>`, `benchmark <input.yaml> <assertions.yaml>`, `import-tests <file.xlsx>`.

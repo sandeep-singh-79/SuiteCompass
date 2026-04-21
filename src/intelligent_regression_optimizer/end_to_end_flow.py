@@ -1,6 +1,6 @@
 """End-to-end pipeline for intelligent-regression-optimizer.
 
-Wires: load_input → classify_context → score_tests → render_report → validate_output
+Wires: load_input → (merge_history) → classify_context → score_tests → render_report → validate_output
 """
 from __future__ import annotations
 
@@ -11,14 +11,88 @@ from intelligent_regression_optimizer.models import (
     EXIT_OK,
     EXIT_VALIDATION_ERROR,
     FlowResult,
+    TestHistoryRecord,
 )
 
 
-def run_pipeline(input_path: str) -> FlowResult:
+# ---------------------------------------------------------------------------
+# History merge
+# ---------------------------------------------------------------------------
+
+def merge_history(
+    normalized: dict[str, Any],
+    history: dict[str, TestHistoryRecord],
+) -> tuple[dict[str, Any], list[str]]:
+    """Overlay history-derived metrics onto the test_suite in *normalized*.
+
+    For each test whose ID is found in *history*:
+
+    - ``flakiness_rate`` is replaced by the history-computed value.
+    - ``failure_count_last_30d`` and ``total_runs`` are added from the record.
+
+    When the existing YAML ``flakiness_rate`` differs from the history value,
+    a human-readable warning string is appended to the returned list.
+
+    This function does **not** mutate *normalized* — it returns a new dict.
+
+    Args:
+        normalized: Validated and normalised input dict from :func:`load_input`.
+        history: Mapping of test_id → :class:`TestHistoryRecord`.
+
+    Returns:
+        Tuple of ``(updated_normalized, warnings)``.
+    """
+    if not history:
+        return normalized, []
+
+    warnings: list[str] = []
+    updated_tests: list[dict] = []
+
+    for test in normalized.get("test_suite", []):
+        record = history.get(test["id"])
+        if record is None:
+            updated_tests.append(test)
+            continue
+
+        yaml_flakiness: float = test.get("flakiness_rate", 0.0)
+        hist_flakiness: float = record.flakiness_rate
+
+        if abs(yaml_flakiness - hist_flakiness) > 1e-9:
+            warnings.append(
+                f"[history-override] test_id={test['id']!r}: "
+                f"flakiness_rate {yaml_flakiness:.3f} \u2192 {hist_flakiness:.3f} "
+                f"(history wins)"
+            )
+
+        updated_tests.append({
+            **test,
+            "flakiness_rate": hist_flakiness,
+            "failure_count_last_30d": record.failure_count_last_30d,
+            "total_runs": record.total_runs,
+        })
+
+    updated_normalized = {
+        **normalized,
+        "test_suite": updated_tests,
+    }
+    return updated_normalized, warnings
+
+
+# ---------------------------------------------------------------------------
+# Pipeline entry points
+# ---------------------------------------------------------------------------
+
+def run_pipeline(
+    input_path: str,
+    history: dict[str, TestHistoryRecord] | None = None,
+) -> FlowResult:
     """Run the full deterministic pipeline on *input_path*.
 
     Args:
         input_path: Path to the input YAML file.
+        history: Optional pre-loaded history mapping (test_id → record).
+            When supplied, history values are merged onto the YAML test_suite
+            before the scoring pipeline runs.
 
     Returns:
         :class:`FlowResult` with exit_code and the rendered markdown in
@@ -37,7 +111,13 @@ def run_pipeline(input_path: str) -> FlowResult:
     except InputValidationError as exc:
         return FlowResult(exit_code=EXIT_INPUT_ERROR, message=str(exc), output_path=None)
 
-    return _run_from_package(package.normalized)
+    normalized = package.normalized
+
+    # 2. Overlay history when provided
+    if history:
+        normalized, _ = merge_history(normalized, history)
+
+    return _run_from_package(normalized)
 
 
 def run_pipeline_from_merged(data: dict[str, Any]) -> FlowResult:

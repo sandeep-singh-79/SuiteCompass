@@ -167,9 +167,19 @@ this way, the heuristic may be unreliable.
 - `<skipped>` tests are excluded from all calculations
 - `<error>` elements are treated identically to `<failure>` elements
 - If no timestamp is present on a `<testsuite>`, that run's failures are included in `failure_count_last_30d` conservatively (we cannot confirm it was old)
-- History values take precedence over manually entered YAML values; a warning is logged when an override occurs
+- History values take precedence over manually entered YAML values; a `[history-override]` warning is emitted for every test where the values differ
 
-**Manual override remains available:** if CI history is unavailable or incomplete, you can still enter `flakiness_rate` and `failure_count_last_30d` directly in the YAML and omit `--history-dir`.
+**How history is merged into the pipeline (V1-A, `merge_history()`):**
+
+When history data is available it is merged into the normalized input *before* scoring runs:
+
+1. For each test in `test_suite`, look up its `id` in the history dict.
+2. If found: replace `flakiness_rate` with the history value; set `failure_count_last_30d` and `total_runs` from the history record.
+3. If a test's YAML `flakiness_rate` differs from the history value, a `[history-override]` warning is recorded.
+4. Tests not present in history are left unchanged.
+5. The scoring engine then receives the merged test_suite — history-derived flakiness values affect tier placement and retire decisions exactly as if they had been typed into the YAML.
+
+**Manual override remains available:** if CI history is unavailable or incomplete, you can still enter `flakiness_rate` directly in the YAML and omit `--history-dir`.
 
 ---
 
