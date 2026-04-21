@@ -1,7 +1,7 @@
 """E2E tests — full pipeline through all 3 benchmarks — written RED before implementation."""
 import pathlib
 import pytest
-from intelligent_regression_optimizer.end_to_end_flow import run_pipeline, merge_history
+from intelligent_regression_optimizer.end_to_end_flow import run_pipeline, merge_history, run_pipeline_from_merged
 from intelligent_regression_optimizer.models import EXIT_OK, EXIT_INPUT_ERROR, TestHistoryRecord
 
 BENCHMARKS = pathlib.Path(__file__).parent.parent / "benchmarks"
@@ -233,4 +233,62 @@ class TestRunPipelineWithHistory:
         assert result.exit_code == EXIT_OK
         # The output should mention the retire section
         assert "Retire" in result.message or "retire" in result.message.lower()
+
+
+# ---------------------------------------------------------------------------
+# run_pipeline_from_merged() with history (covers end_to_end_flow.py line 148)
+# ---------------------------------------------------------------------------
+
+class TestRunPipelineFromMergedWithHistory:
+    def test_history_overlaid_in_merged_mode(self):
+        """History supplied to run_pipeline_from_merged() is merged before scoring."""
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": "T-merged",
+                    "name": "Merged test",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.05,   # below retire threshold
+                    "automated": True,
+                }
+            ],
+            "constraints": {"flakiness_retire_threshold": 0.30, "time_budget_mins": 60},
+        }
+        history = {
+            "T-merged": TestHistoryRecord(
+                test_id="T-merged",
+                flakiness_rate=0.95,   # above retire threshold
+                failure_count_last_30d=19,
+                total_runs=20,
+            )
+        }
+        result = run_pipeline_from_merged(data, history=history)
+        assert result.exit_code == EXIT_OK
+        assert "retire" in result.message.lower() or "Retire" in result.message
+
+    def test_merged_mode_without_history_exits_ok(self):
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": "T-001",
+                    "name": "Test 001",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.1,
+                    "automated": True,
+                }
+            ],
+            "constraints": {},
+        }
+        result = run_pipeline_from_merged(data)
+        assert result.exit_code == EXIT_OK
 

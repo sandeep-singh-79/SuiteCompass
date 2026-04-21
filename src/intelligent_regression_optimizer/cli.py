@@ -60,10 +60,6 @@ def run(
         click.echo("Error: provide either INPUT_FILE or both --tests and --sprint.", err=True)
         sys.exit(EXIT_INPUT_ERROR)
 
-    if bool(tests) != bool(sprint):
-        click.echo("Error: --tests and --sprint must be used together.", err=True)
-        sys.exit(EXIT_INPUT_ERROR)
-
     if history_dir and history_file:
         click.echo("Error: --history-dir and --history-file are mutually exclusive.", err=True)
         sys.exit(EXIT_INPUT_ERROR)

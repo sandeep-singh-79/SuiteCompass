@@ -63,6 +63,12 @@ class TestRunCommand:
             result = runner.invoke(main, ["run", str(BENCHMARKS / name)])
             assert result.exit_code == 0, f"Failed on {name}: {result.output}"
 
+    def test_run_tests_without_sprint_exits_2(self, repo_tmp):
+        """--tests without --sprint should exit 2 (guard-rail for mismatched flags)."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "--tests", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml")])
+        assert result.exit_code == 2
+
 
 class TestBenchmarkCommand:
     """iro benchmark <input.yaml> <assertions.yaml> subcommand."""
@@ -342,4 +348,39 @@ class TestHistoryFlags:
             ["run", str(input_p), "--history-dir", str(xml_dir), "--history-file", str(csv_p)]
         )
         assert result.exit_code == 2
+
+    def test_history_dir_malformed_xml_exits_2(self, tmp_path):
+        """A malformed XML file in --history-dir should exit 2."""
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        input_p = self._minimal_input(tmp_path)
+        (xml_dir / "run-01.xml").write_text("<not valid xml <><")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(xml_dir)])
+        assert result.exit_code == 2
+
+    def test_history_file_csv_bad_data_exits_2(self, tmp_path):
+        """A CSV with invalid field values should exit 2."""
+        input_p = self._minimal_input(tmp_path, "T-001")
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text(
+            "test_id,flakiness_rate,failure_count_last_30d,total_runs\n"
+            "T-001,not_a_number,1,10\n"
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 2
+
+    def test_history_file_json_bad_data_exits_2(self, tmp_path):
+        """A JSON history file with invalid field values should exit 2."""
+        import json
+        input_p = self._minimal_input(tmp_path, "T-001")
+        json_p = tmp_path / "history.json"
+        json_p.write_text(json.dumps([
+            {"test_id": "T-001", "flakiness_rate": "not_a_number", "failure_count_last_30d": 1, "total_runs": 10}
+        ]))
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(json_p)])
+        assert result.exit_code == 2
+
 

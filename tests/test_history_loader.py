@@ -369,3 +369,9 @@ class TestLoadHistoryJsonErrors:
         _write_json(p, [{"test_id": "T-001", "flakiness_rate": 0.1, "failure_count_last_30d": 1, "total_runs": "lots"}])
         with pytest.raises(InputValidationError, match="total_runs"):
             load_history_json(str(p))
+
+    def test_non_numeric_flakiness_raises(self, tmp_path):
+        p = tmp_path / "history.json"
+        _write_json(p, [{"test_id": "T-001", "flakiness_rate": "very_high", "failure_count_last_30d": 1, "total_runs": 10}])
+        with pytest.raises(InputValidationError, match="flakiness_rate"):
+            load_history_json(str(p))

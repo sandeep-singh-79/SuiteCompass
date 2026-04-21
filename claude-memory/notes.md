@@ -10,6 +10,14 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ## Open Questions
 - None at session start.
 
+## Coverage Notes (V1-A sealed)
+Known unreachable/pre-existing lines that don't warrant tests:
+- `junit_xml_parser.py` line 116: `_compute_flakiness_rate` `total == 0` guard — unreachable from public API (accumulator never produces empty entry lists)
+- `end_to_end_flow.py` line 172: `EXIT_VALIDATION_ERROR` from `_run_from_package` — requires renderer to emit invalid markdown; not possible with normal inputs
+- `context_classifier.py` line 89: pre-existing partial branch from before V1-A
+- `input_loader.py` line 102: pre-existing line from before V1-A
+- `excel_loader.py`: pre-existing gaps from before V1-A
+
 ## v1.0 Active Phase Tracker
 
 | Sub-phase | Description | Status |
@@ -18,7 +26,7 @@ In-progress analysis, temporary notes, open questions, and working context for t
 | A2 | JUnit XML parser (junit_xml_parser.py, stdlib ElementTree) | Complete — 21 tests, 100% coverage, LEARNING-GUIDE updated |
 | A3 | merge_history() + pipeline wiring in end_to_end_flow.py | Complete — 15 new tests, end_to_end_flow 97% coverage |
 | A4 | --history-dir / --history-file CLI flags + benchmark | Complete — 10 new tests, cli.py 94% coverage |
-| A5 | Phase A hardening (coverage ≥ 90%, regression check) | Not started |
+| A5 | Phase A hardening (coverage ≥ 90%, regression check) | Complete — 343 tests, 98.40% coverage, cli.py/history_loader.py at 100% |
 | B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Not started |
 | B2 | iro diff-areas subcommand + iro run integration | Not started |
 | B3 | Phase B hardening | Not started |
