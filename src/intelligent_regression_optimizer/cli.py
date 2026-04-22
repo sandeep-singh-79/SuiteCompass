@@ -17,7 +17,7 @@ from .excel_loader import ExcelLoaderError, load_excel
 from .history_loader import load_history_csv, load_history_json
 from .junit_xml_parser import parse_junit_directory
 from .input_loader import InputValidationError
-from .models import EXIT_GENERATION_ERROR, EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
+from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
 from .llm_flow import run_llm_pipeline
 from .config_loader import load_llm_config
 from .client_factory import create_llm_client
@@ -53,6 +53,8 @@ def main() -> None:
               help="File containing 'git diff --name-only' output (use with --area-map).")
 @click.option("--ref", type=str, default=None,
               help="Git ref to diff against (default HEAD~1, use with --area-map).")
+@click.option("--summary-only", is_flag=True, default=False,
+              help="Output only the Optimisation Summary section of the report.")
 def run(
     input_file: str | None,
     output: str | None,
@@ -70,6 +72,7 @@ def run(
     area_map: str | None,
     diff_file: str | None,
     ref: str | None,
+    summary_only: bool,
 ) -> None:
     """Run the optimisation pipeline on INPUT_FILE and print the report.
 
@@ -226,15 +229,7 @@ def run(
             # Merge mode: reconstruct from the two YAML files already validated above
             from .end_to_end_flow import merge_history
             from .input_loader import validate_raw
-            with Path(tests).open(encoding="utf-8") as fh:  # type: ignore[arg-type]
-                tests_data = yaml.safe_load(fh)
-            with Path(sprint).open(encoding="utf-8") as fh:  # type: ignore[arg-type]
-                sprint_data = yaml.safe_load(fh)
-            merged_data = {
-                "sprint_context": sprint_data["sprint_context"],
-                "test_suite": tests_data["test_suite"],
-                "constraints": sprint_data["constraints"],
-            }
+            merged_data = _read_and_merge_yaml(tests, sprint)  # type: ignore[arg-type]
             normalized = validate_raw(merged_data)
             if history:
                 normalized, _ = merge_history(normalized, history)
@@ -242,14 +237,14 @@ def run(
                 from .diff_mapper import apply_area_map
                 normalized = apply_area_map(normalized, changed_areas)
 
+        # Propagate history provenance so the LLM prompt can cite its data source
+        if history is not None:
+            normalized.setdefault("_meta", {})["history_source"] = "ci-history"
+
         classifications = classify_context(normalized)
         tier_result = score_tests(normalized, classifications)
 
         llm_result = run_llm_pipeline(normalized, classifications, tier_result, llm_client)
-
-        if llm_result.flow_result.exit_code == EXIT_GENERATION_ERROR:
-            click.echo(f"LLM generation error: {llm_result.flow_result.message}", err=True)
-            sys.exit(EXIT_GENERATION_ERROR)
 
         if mode == "compare":
             from .comparison import build_comparison_report
@@ -257,11 +252,22 @@ def run(
         else:
             report = llm_result.flow_result.message
 
-        _emit(output, report)
+        _emit(output, _maybe_summarise(report, summary_only))
         sys.exit(EXIT_OK)
 
-    _emit(output, result.message)
+    _emit(output, _maybe_summarise(result.message, summary_only))
     sys.exit(EXIT_OK)
+
+
+def _maybe_summarise(content: str, summary_only: bool) -> str:
+    """Return only the Optimisation Summary section when summary_only is set."""
+    if not summary_only:
+        return content
+    import re
+    match = re.search(
+        r"(## Optimisation Summary.*?)(?=\n## |\Z)", content, re.DOTALL
+    )
+    return match.group(1).rstrip() + "\n" if match else content
 
 
 def _emit(output: str | None, content: str) -> None:
@@ -345,6 +351,22 @@ def _run_merged(
     }
 
     return run_pipeline_from_merged(merged, history=history, changed_areas=changed_areas)
+
+
+def _read_and_merge_yaml(tests_path: str, sprint_path: str) -> dict[str, Any]:
+    """Read test_suite YAML and sprint YAML, merge into a combined input dict.
+
+    Assumes both files exist and contain the expected keys.
+    """
+    with Path(tests_path).open(encoding="utf-8") as fh:
+        tests_data = yaml.safe_load(fh)
+    with Path(sprint_path).open(encoding="utf-8") as fh:
+        sprint_data = yaml.safe_load(fh)
+    return {
+        "sprint_context": sprint_data["sprint_context"],
+        "test_suite": tests_data["test_suite"],
+        "constraints": sprint_data["constraints"],
+    }
 
 
 @main.command()

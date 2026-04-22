@@ -70,6 +70,52 @@ class TestRunCommand:
         assert result.exit_code == 2
 
 
+# ---------------------------------------------------------------------------
+# R2: --summary-only mode (F2)
+# ---------------------------------------------------------------------------
+
+class TestSummaryOnlyFlag:
+    """--summary-only outputs only the Optimisation Summary section."""
+
+    def test_summary_only_exits_0(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert result.exit_code == 0
+
+    def test_summary_only_contains_optimisation_summary_heading(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Optimisation Summary" in result.output
+
+    def test_summary_only_excludes_must_run_section(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Must-Run" not in result.output
+
+    def test_summary_only_excludes_suite_health_section(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Suite Health Summary" not in result.output
+
+    def test_summary_only_output_shorter_than_full_report(self):
+        runner = CliRunner()
+        full = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml")],
+        ).output
+        summary_only = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        ).output
+        assert len(summary_only) < len(full)
+
+
 class TestBenchmarkCommand:
     """iro benchmark <input.yaml> <assertions.yaml> subcommand."""
 
