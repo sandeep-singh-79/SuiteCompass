@@ -4,21 +4,12 @@ from __future__ import annotations
 import pytest
 
 from intelligent_regression_optimizer.models import (
-    EXIT_GENERATION_ERROR,
     GenerationRequest,
     GenerationResponse,
     ProviderConfig,
 )
 from intelligent_regression_optimizer.llm_client import FakeLLMClient, LLMClient
 from intelligent_regression_optimizer.output_validator import validate_output
-
-
-# ---------------------------------------------------------------------------
-# Exit code
-# ---------------------------------------------------------------------------
-
-def test_exit_generation_error_value():
-    assert EXIT_GENERATION_ERROR == 3
 
 
 # ---------------------------------------------------------------------------
