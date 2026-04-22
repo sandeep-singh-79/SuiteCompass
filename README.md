@@ -21,7 +21,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 | Path | Purpose |
 |---|---|
 | `src/intelligent_regression_optimizer/` | Core package — loader, classifier, scorer, renderer, validator, CLI |
-| `tests/` | 228+ pytest tests (98%+ coverage) |
+| `tests/` | 562 pytest tests (96.47% coverage) |
 | `benchmarks/` | Benchmark input YAMLs + assertion files + sample Excel |
 | `templates/` | Excel import template (13 columns) |
 | `docs/` | Full documentation (see index below) |
