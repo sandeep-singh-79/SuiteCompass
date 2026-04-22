@@ -20,11 +20,14 @@ def _select_scenario(classifications: dict[str, Any], tier_result: TierResult) -
 def _format_tier_assignments(tier_result: TierResult) -> str:
     lines = []
     for test in tier_result.must_run:
-        lines.append(f"  MUST-RUN: {test.test_id} {test.name} (score: {test.raw_score:.1f})")
+        override = f" [override: {test.override_reason}]" if test.is_override and test.override_reason else ""
+        lines.append(f"  MUST-RUN: {test.test_id} {test.name} (score: {test.raw_score:.1f}){override}")
     for test in tier_result.should_run:
-        lines.append(f"  SHOULD-RUN: {test.test_id} {test.name} (score: {test.raw_score:.1f})")
+        override = f" [override: {test.override_reason}]" if test.is_override and test.override_reason else ""
+        lines.append(f"  SHOULD-RUN: {test.test_id} {test.name} (score: {test.raw_score:.1f}){override}")
     for test in tier_result.defer:
-        lines.append(f"  DEFER: {test.test_id} {test.name} (score: {test.raw_score:.1f})")
+        override = f" [override: {test.override_reason}]" if test.is_override and test.override_reason else ""
+        lines.append(f"  DEFER: {test.test_id} {test.name} (score: {test.raw_score:.1f}){override}")
     for test in tier_result.retire:
         lines.append(f"  RETIRE: {test.test_id} {test.name} (flakiness: {test.flakiness_rate:.2f})")
     return "\n".join(lines) if lines else "  (no tests)"
@@ -67,6 +70,7 @@ def build_prompt(
     template = load_template(scenario)
 
     constraints = normalized.get("constraints", {})
+    history_source = normalized.get("_meta", {}).get("history_source", "input (YAML)")
     user_prompt = template.format(
         sprint_risk_level=classifications.get("sprint_risk_level", "unknown"),
         suite_health=classifications.get("suite_health", "unknown"),
@@ -84,5 +88,6 @@ def build_prompt(
         total_tests=len(normalized.get("test_suite", [])),
         flakiness_high_count=_flakiness_high_count(normalized),
         must_run_exec_mins=f"{_must_run_exec_mins(tier_result, normalized):.0f}",
+        history_source=history_source,
     )
     return system_prompt, user_prompt

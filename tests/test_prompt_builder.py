@@ -157,3 +157,41 @@ def test_user_prompt_contains_all_tier_types():
     assert "T-02" in usr_p
     assert "T-03" in usr_p
     assert "T-04" in usr_p
+
+
+# ---------------------------------------------------------------------------
+# R3: Override reason + history provenance (F3)
+# ---------------------------------------------------------------------------
+
+def test_override_reason_included_in_tier_assignments():
+    """When a test is overridden, the override reason must appear in the user prompt."""
+    overridden = ScoredTest(
+        test_id="T-OV", name="Override me", raw_score=6.0, tier="must-run",
+        is_override=True, override_reason="mandatory: regulatory audit",
+        is_manual=False, flakiness_rate=0.0,
+    )
+    tier = _make_tier_result(must_run=[overridden])
+    _, usr_p = build_prompt(_base_normalized(), _base_classifications(), tier)
+    assert "regulatory audit" in usr_p
+
+
+def test_no_override_noise_for_normal_tests():
+    """Non-overridden tests must not have an override note in the prompt."""
+    tier = _make_tier_result(must_run=[_make_scored_test("T-01")])
+    _, usr_p = build_prompt(_base_normalized(), _base_classifications(), tier)
+    assert "override" not in usr_p.lower()
+
+
+def test_history_source_ci_in_user_prompt():
+    """When flakiness data comes from CI history, that provenance is stated in the prompt."""
+    normalized = _base_normalized()
+    normalized.setdefault("_meta", {})["history_source"] = "ci-history"
+    _, usr_p = build_prompt(normalized, _base_classifications(), _make_tier_result())
+    assert "ci-history" in usr_p.lower() or "ci history" in usr_p.lower()
+
+
+def test_history_source_defaults_to_input_yaml_when_absent():
+    """When no _meta key is present the prompt states data comes from input YAML."""
+    normalized = _base_normalized()  # no _meta key
+    _, usr_p = build_prompt(normalized, _base_classifications(), _make_tier_result())
+    assert "input" in usr_p.lower() or "yaml" in usr_p.lower()

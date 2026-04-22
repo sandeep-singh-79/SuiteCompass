@@ -19,6 +19,7 @@ Suite metrics:
   Total tests: {total_tests}
   Flakiness high count: {flakiness_high_count}
   Must-run automated execution time: {must_run_exec_mins} min
+  Flakiness data source: {history_source}
 
 Produce the full report. Explain WHY each must-run test is critical given the high-risk sprint context.
 Add a brief risk narrative in the Optimisation Summary explaining what is at stake this sprint.
