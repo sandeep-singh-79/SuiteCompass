@@ -241,6 +241,53 @@ The backlog below represents possible future directions but is not planned work.
 
 ---
 
+## V1-C — LLM Narrative Layer + V1-C Review Remediation (Sealed 2026-04-22)
+
+### Scope Delivered
+
+| Capability | Commits |
+|---|---|
+| C1 — Multi-provider LLM client abstraction (OpenAI, Gemini, Ollama) | V1-C C1–C4 base |
+| C2 — LLM flow with deterministic fallback | V1-C C1–C4 base |
+| C3 — Prompt builder (v1 templates: balanced, budget_pressure, degraded_suite, high_risk) | V1-C C1–C4 base |
+| C4 — CLI `--llm-*` flags + benchmark runner integration | V1-C C1–C4 base |
+| R5 — Vacuous `or True` assertions replaced with `parse_sections()` checks | R5 commit |
+| R1 — Provider exceptions → deterministic fallback (EXIT_OK, not exit 3) | R1 commit |
+| R3 — Prompt enriched with override reasons + history provenance | R3 commit |
+| R2 — `--summary-only` flag added to CLI | R2 commit |
+| R4 — LLM benchmark narrative-quality assertions + new `llm-enhanced-high-risk` fixture | R4 commit |
+| R6 — Docs/plan/memory reconciled; stale `llm_assisted`, `SUITECOMPASS_LLM_*`, `EXIT_GENERATION_ERROR` references removed | R6 commit |
+
+### Findings and Resolution (V1-C Pre-Seal Review)
+
+| # | Finding | Severity | Resolution |
+|---|---|---|---|
+| F1 | Provider exceptions returned exit 3 instead of deterministic fallback | Critical | R1: `llm_flow.py` catches all provider exceptions; calls `_deterministic_fallback()`; returns EXIT_OK |
+| F2 | `--summary-only` planned but missing from CLI | Major | R2: flag implemented with `_maybe_summarise()` helper |
+| F3 | Prompt omitted override reasons and history provenance | Major | R3: `prompt_builder.py` injects both; all v1 templates updated |
+| F4 | LLM benchmark proved structure only, not narrative quality | Major | R4: `benchmark_runner.py` extended; new assertion types; `llm-enhanced-high-risk` fixture |
+| F5 | Vacuous `or True` assertion in changed-areas E2E test | Minor | R5: `_parse_sections` made public; real section-content assertions |
+| F6 | Plan/docs referenced stale `--summary-only`, `llm_assisted`, `SUITECOMPASS_LLM_*` | Major | R6: all references removed or corrected |
+| F7 | LEARNING-GUIDE claimed all paths exit 0; code contradicted this | Major | R6: LEARNING-GUIDE corrected; deterministic fallback contract documented |
+
+### Final Metrics
+
+| Metric | Value |
+|---|---|
+| Tests passing | 562 |
+| Coverage | 96.47% |
+| Per-module gate (≥ 90%) | Met |
+| Branch | `v1b-diff-mapper` → merged to `master` at tag `v1.0.0` |
+
+### Deferred Items
+
+| Item | Reason |
+|---|---|
+| LLM benchmark in CI | LLM cost + flakiness risk; run on-demand; nightly CI workflow recommended post-v1.0.0 |
+| Multi-provider CI matrix | Requires API key management in CI; deferred until real adoption |
+
+---
+
 ## Documentation Backlog (low priority)
 
 Improvements flagged during post-MVP review. Not planned; prioritise if the tool gains real users.
