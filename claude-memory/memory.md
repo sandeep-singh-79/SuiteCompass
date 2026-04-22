@@ -9,9 +9,9 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: V1-A and V1-B fully implemented and remediated on `v1b-diff-mapper`. All 5 review-gap tracks (R1–R5) complete. 406 tests passing. Branch is acceptance-ready.
+- Current stage: V1-C execution plan written. 10 INVEST stories (C1-1 through C5-1) defined in docs/V1-C-EXECUTION-PLAN.md. Awaiting confirmation before implementation. V1-A/V1-B complete and remediated, 406 tests passing on `v1b-diff-mapper`.
 - Active branch: `v1b-diff-mapper`.
-- Decision pending: merge `v1b-diff-mapper` to master, or start V1-C increment on a new branch first.
+- Decision pending: merge `v1b-diff-mapper` to master before creating `v1c-llm-narrative`, or branch from `v1b-diff-mapper` directly.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
@@ -20,10 +20,14 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 - **DRY** — extract shared logic only when duplication is real (≥2 actual occurrences)
 - **YAGNI** — implement only what the current sub-phase needs; no extension points for hypothetical future use
 - **KISS** — simple implementation first; introduce patterns only when complexity genuinely demands them
+- **Simple code first, patterns via refactoring** — write the simplest working implementation first. Design patterns are a refactoring tool, not a starting point. Introduce them only when the code's complexity warrants the abstraction, not preemptively.
 - **Reuse-first** — extend existing modules before creating new ones; copy-adapt from QEStrategyForge over rebuilding from scratch
 
 ### TDD Discipline (NON-NEGOTIABLE)
-- Write failing test FIRST. Make it pass. Refactor. Never in any other order.
+- Cycle: **Red → Green → Refactor**. Never in any other order.
+  - **Red:** Write the failing test first. No production code before a failing test exists.
+  - **Green:** Write the *simplest* code that makes the test pass. No premature abstraction.
+  - **Refactor:** Clean up. Remove duplication. Introduce design patterns *only here, only when the existing complexity warrants them*. Patterns are a refactoring tool, not a starting point.
 - Do not mark a sub-phase complete until `pytest --tb=short -q` passes and coverage is reported
 - Coverage ≥ 90% per module — measured after each sub-phase, not deferred to hardening
 - Code is not complete until tested with pass/fail evidence and coverage numbers in the session

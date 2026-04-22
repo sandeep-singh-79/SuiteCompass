@@ -11,6 +11,7 @@ from typing import Any
 EXIT_OK: int = 0
 EXIT_VALIDATION_ERROR: int = 1
 EXIT_INPUT_ERROR: int = 2
+EXIT_GENERATION_ERROR: int = 3
 
 # ---------------------------------------------------------------------------
 # Core data structures
@@ -87,3 +88,40 @@ class TestHistoryRecord:
     failure_count_last_30d: int
     total_runs: int
     last_run_date: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# V1-C: LLM integration data structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class ProviderConfig:
+    """Configuration for an LLM provider."""
+
+    provider: str
+    model: str
+    base_url: str | None
+    api_key: str | None
+    temperature: float
+    max_tokens: int
+
+
+@dataclass(slots=True)
+class GenerationRequest:
+    """Input to an LLM generate call."""
+
+    system_prompt: str
+    user_prompt: str
+    config: ProviderConfig
+
+
+@dataclass(slots=True)
+class GenerationResponse:
+    """Output from an LLM generate call."""
+
+    content: str
+    model: str
+    provider: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None

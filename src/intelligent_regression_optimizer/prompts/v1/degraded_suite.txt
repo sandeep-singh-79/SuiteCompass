@@ -1,0 +1,23 @@
+The test suite is in a DEGRADED state with elevated flakiness. Focus your narrative on suite health remediation alongside the sprint optimisation.
+
+Sprint context:
+  Risk level: {sprint_risk_level}
+  Time pressure: {time_pressure}
+  Suite health: {suite_health}
+  Time budget: {time_budget_mins} minutes
+  Budget overflow: {budget_overflow}
+  NFR elevation required: {nfr_elevation_required}
+  Changed areas: {changed_areas}
+
+Stories in scope:
+{stories_summary}
+
+Test tier assignments (use these exactly — do not change any tier):
+{tier_assignments}
+
+Suite metrics:
+  Total tests: {total_tests}
+  Flakiness high count: {flakiness_high_count}
+  Must-run automated execution time: {must_run_exec_mins} min
+
+Produce the full report. In the Suite Health Summary, explain the degraded state and recommend actions to stabilise the suite over the next 1-2 sprints.

@@ -1,0 +1,119 @@
+"""LLM pipeline orchestration: prompt → generate → validate → repair → fallback."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from intelligent_regression_optimizer.llm_client import LLMClient
+from intelligent_regression_optimizer.models import (
+    EXIT_GENERATION_ERROR,
+    EXIT_OK,
+    FlowResult,
+    ProviderConfig,
+    TierResult,
+)
+from intelligent_regression_optimizer.output_validator import validate_output
+from intelligent_regression_optimizer.prompt_builder import build_prompt
+from intelligent_regression_optimizer.repair import repair_output
+
+
+@dataclass
+class LLMFlowResult:
+    """Extended result carrying repair and fallback metadata."""
+
+    flow_result: FlowResult
+    recommendation_mode: str           # "llm" | "llm-repaired" | "deterministic-fallback"
+    raw_llm_output: str | None
+    repair_actions: list[str] = field(default_factory=list)
+
+
+def run_llm_pipeline(
+    normalized: dict[str, Any],
+    classifications: dict[str, Any],
+    tier_result: TierResult,
+    client: LLMClient,
+) -> LLMFlowResult:
+    """Full LLM pipeline: prompt → generate → validate → repair → fallback.
+
+    Steps:
+    1. Build prompt from normalized/classifications/tier_result.
+    2. Call client.generate().
+    3. Validate raw LLM output.
+    4. If invalid: attempt structural repair, re-validate.
+    5. If still invalid: fall back to deterministic renderer.
+    Returns LLMFlowResult with appropriate recommendation_mode.
+    """
+    from intelligent_regression_optimizer.models import GenerationRequest, ProviderConfig
+
+    # Step 1: build prompt
+    system_prompt, user_prompt = build_prompt(normalized, classifications, tier_result)
+
+    # Construct a minimal config to carry the request (provider details live in the client)
+    dummy_config = ProviderConfig(
+        provider="", model="", base_url=None, api_key=None, temperature=0.3, max_tokens=4096,
+    )
+    request = GenerationRequest(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        config=dummy_config,
+    )
+
+    # Step 2: generate
+    try:
+        response = client.generate(request)
+    except Exception as exc:
+        return LLMFlowResult(
+            flow_result=FlowResult(
+                exit_code=EXIT_GENERATION_ERROR,
+                message=str(exc),
+                output_path=None,
+            ),
+            recommendation_mode="error",
+            raw_llm_output=None,
+        )
+
+    raw_output = response.content
+
+    # Step 3: validate raw output
+    validation = validate_output(raw_output)
+    if validation.is_valid:
+        return LLMFlowResult(
+            flow_result=FlowResult(exit_code=EXIT_OK, message=raw_output, output_path=None),
+            recommendation_mode="llm",
+            raw_llm_output=raw_output,
+        )
+
+    # Step 4: repair
+    repair_result = repair_output(raw_output, tier_result, classifications)
+    repaired_validation = validate_output(repair_result.markdown)
+    if repaired_validation.is_valid:
+        return LLMFlowResult(
+            flow_result=FlowResult(exit_code=EXIT_OK, message=repair_result.markdown, output_path=None),
+            recommendation_mode="llm-repaired",
+            raw_llm_output=raw_output,
+            repair_actions=repair_result.actions,
+        )
+
+    # Step 5: deterministic fallback
+    fallback_md = _deterministic_fallback(normalized, classifications, tier_result)
+    return LLMFlowResult(
+        flow_result=FlowResult(exit_code=EXIT_OK, message=fallback_md, output_path=None),
+        recommendation_mode="deterministic-fallback",
+        raw_llm_output=raw_output,
+        repair_actions=repair_result.actions,
+    )
+
+
+def _deterministic_fallback(
+    normalized: dict[str, Any],
+    classifications: dict[str, Any],
+    tier_result: TierResult,
+) -> str:
+    """Render a deterministic report and patch the Recommendation Mode label."""
+    from intelligent_regression_optimizer.renderer import render_report
+    md = render_report(normalized, classifications, tier_result)
+    return md.replace(
+        "Recommendation Mode: deterministic",
+        "Recommendation Mode: deterministic-fallback",
+        1,
+    )

@@ -1,0 +1,23 @@
+The sprint is time-pressured and the must-run set exceeds the time budget. Explain the trade-offs clearly.
+
+Sprint context:
+  Risk level: {sprint_risk_level}
+  Time pressure: {time_pressure}
+  Suite health: {suite_health}
+  Time budget: {time_budget_mins} minutes
+  Budget overflow: {budget_overflow}
+  NFR elevation required: {nfr_elevation_required}
+  Changed areas: {changed_areas}
+
+Stories in scope:
+{stories_summary}
+
+Test tier assignments (use these exactly — do not change any tier):
+{tier_assignments}
+
+Suite metrics:
+  Total tests: {total_tests}
+  Flakiness high count: {flakiness_high_count}
+  Must-run automated execution time: {must_run_exec_mins} min
+
+Produce the full report. In the Optimisation Summary, clearly explain what was deferred due to budget overflow and what risk that carries.

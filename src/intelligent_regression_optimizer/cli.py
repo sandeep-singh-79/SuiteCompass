@@ -17,7 +17,10 @@ from .excel_loader import ExcelLoaderError, load_excel
 from .history_loader import load_history_csv, load_history_json
 from .junit_xml_parser import parse_junit_directory
 from .input_loader import InputValidationError
-from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
+from .models import EXIT_GENERATION_ERROR, EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
+from .llm_flow import run_llm_pipeline
+from .config_loader import load_llm_config
+from .client_factory import create_llm_client
 
 
 @click.group()
@@ -28,6 +31,14 @@ def main() -> None:
 @main.command()
 @click.argument("input_file", type=click.Path(exists=False), required=False, default=None)
 @click.option("--output", "-o", type=click.Path(), default=None, help="Write report to file instead of stdout.")
+@click.option("--mode", type=click.Choice(["deterministic", "llm", "compare"]), default="deterministic",
+              help="Recommendation mode: deterministic (default), llm, or compare.")
+@click.option("--provider", type=str, default=None, help="LLM provider (openai, ollama, gemini).")
+@click.option("--model", type=str, default=None, help="LLM model identifier.")
+@click.option("--base-url", type=str, default=None, help="LLM provider base URL override.")
+@click.option("--temperature", type=float, default=None, help="LLM sampling temperature.")
+@click.option("--max-tokens", type=int, default=None, help="LLM max response tokens.")
+@click.option("--config", "llm_config", type=click.Path(), default=None, help="Path to LLM config YAML.")
 @click.option("--tests", type=click.Path(), default=None,
               help="Path to test_suite YAML file (use with --sprint).")
 @click.option("--sprint", type=click.Path(), default=None,
@@ -45,6 +56,13 @@ def main() -> None:
 def run(
     input_file: str | None,
     output: str | None,
+    mode: str,
+    provider: str | None,
+    model: str | None,
+    base_url: str | None,
+    temperature: float | None,
+    max_tokens: int | None,
+    llm_config: str | None,
     tests: str | None,
     sprint: str | None,
     history_dir: str | None,
@@ -167,12 +185,91 @@ def run(
     for warning in result.warnings:
         click.echo(f"Warning: {warning}", err=True)
 
-    if output:
-        Path(output).write_text(result.message, encoding="utf-8")
-    else:
-        click.echo(result.message)
+    # LLM mode routing — deterministic result is used for comparison and as fallback context
+    if mode in ("llm", "compare"):
+        cli_overrides: dict[str, Any] = {}
+        if provider:
+            cli_overrides["provider"] = provider
+        if model:
+            cli_overrides["model"] = model
+        if base_url:
+            cli_overrides["base_url"] = base_url
+        if temperature is not None:
+            cli_overrides["temperature"] = temperature
+        if max_tokens is not None:
+            cli_overrides["max_tokens"] = max_tokens
 
+        try:
+            llm_cfg = load_llm_config(config_path=llm_config, cli_overrides=cli_overrides)
+        except (FileNotFoundError, ValueError) as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+
+        if llm_cfg.provider in ("openai", "gemini") and not llm_cfg.api_key:
+            click.echo(
+                f"Error: --mode {mode} with provider {llm_cfg.provider!r} requires IRO_LLM_API_KEY.",
+                err=True,
+            )
+            sys.exit(EXIT_INPUT_ERROR)
+
+        llm_client = create_llm_client(llm_cfg)
+
+        # Re-derive normalized/classifications/tier_result for the LLM layer
+        from .context_classifier import classify_context
+        from .scoring_engine import score_tests
+        from .input_loader import load_input
+
+        if input_file:
+            pkg = load_input(input_file)
+            normalized = pkg.normalized
+        else:
+            # Merge mode: reconstruct from the two YAML files already validated above
+            from .end_to_end_flow import merge_history
+            from .input_loader import validate_raw
+            with Path(tests).open(encoding="utf-8") as fh:  # type: ignore[arg-type]
+                tests_data = yaml.safe_load(fh)
+            with Path(sprint).open(encoding="utf-8") as fh:  # type: ignore[arg-type]
+                sprint_data = yaml.safe_load(fh)
+            merged_data = {
+                "sprint_context": sprint_data["sprint_context"],
+                "test_suite": tests_data["test_suite"],
+                "constraints": sprint_data["constraints"],
+            }
+            normalized = validate_raw(merged_data)
+            if history:
+                normalized, _ = merge_history(normalized, history)
+            if changed_areas is not None:
+                from .diff_mapper import apply_area_map
+                normalized = apply_area_map(normalized, changed_areas)
+
+        classifications = classify_context(normalized)
+        tier_result = score_tests(normalized, classifications)
+
+        llm_result = run_llm_pipeline(normalized, classifications, tier_result, llm_client)
+
+        if llm_result.flow_result.exit_code == EXIT_GENERATION_ERROR:
+            click.echo(f"LLM generation error: {llm_result.flow_result.message}", err=True)
+            sys.exit(EXIT_GENERATION_ERROR)
+
+        if mode == "compare":
+            from .comparison import build_comparison_report
+            report = build_comparison_report(result.message, llm_result)
+        else:
+            report = llm_result.flow_result.message
+
+        _emit(output, report)
+        sys.exit(EXIT_OK)
+
+    _emit(output, result.message)
     sys.exit(EXIT_OK)
+
+
+def _emit(output: str | None, content: str) -> None:
+    """Write content to file or stdout."""
+    if output:
+        Path(output).write_text(content, encoding="utf-8")
+    else:
+        click.echo(content)
 
 
 def _run_merged(
