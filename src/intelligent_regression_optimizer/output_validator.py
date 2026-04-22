@@ -34,7 +34,7 @@ REQUIRED_LABELS: list[str] = list(LABEL_SECTION_MAP.keys())
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _parse_sections(markdown: str) -> dict[str, str]:
+def parse_sections(markdown: str) -> dict[str, str]:
     """Split markdown into sections keyed by heading (line-anchored).
 
     Returns a dict mapping each heading (e.g. "## Must-Run") to the body text
@@ -88,7 +88,7 @@ def validate_output(markdown: str) -> ValidationResult:
             errors.append(f"Missing required heading: {heading!r}")
 
     # --- 2 & 3. Label presence, uniqueness, and section placement -----------
-    sections = _parse_sections(markdown)
+    sections = parse_sections(markdown)
 
     for label, required_section in LABEL_SECTION_MAP.items():
         total_checks += 2  # one for presence, one for section placement

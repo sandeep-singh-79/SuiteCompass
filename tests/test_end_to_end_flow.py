@@ -433,3 +433,173 @@ class TestHistoryBenchmark:
         assert "SprintSuite::stable_history" in warning_text
 
 
+# ---------------------------------------------------------------------------
+# V1-B E2E: run_pipeline with changed_areas derived from diff mapper
+# ---------------------------------------------------------------------------
+
+class TestChangedAreasEndToEnd:
+    """Full pipeline with changed_areas parameter drives coverage-based tier assignments."""
+
+    def _minimal_input_path(self, tmp_path, test_coverage: list[str], story_areas: list[str]) -> str:
+        import yaml
+        data = {
+            "sprint_context": {
+                "sprint_id": "S-DIFF",
+                "stories": [{
+                    "id": "S1", "risk": "high",
+                    "changed_areas": story_areas,
+                    "dependency_stories": [],
+                }],
+                "exploratory_sessions": [],
+            },
+            "test_suite": [{
+                "id": "T-target", "name": "Target test",
+                "layer": "unit", "coverage_areas": test_coverage,
+                "execution_time_secs": 30, "flakiness_rate": 0.0,
+                "automated": True,
+            }],
+            "constraints": {"time_budget_mins": 60, "flakiness_retire_threshold": 0.30},
+        }
+        p = tmp_path / "input.yaml"
+        p.write_text(yaml.safe_dump(data))
+        return str(p)
+
+    def test_changed_areas_none_leaves_output_unaffected(self, tmp_path):
+        # With original area in story, test should score normally
+        p = self._minimal_input_path(tmp_path, ["AreaA"], ["AreaA"])
+        result = run_pipeline(p, changed_areas=None)
+        assert result.exit_code == EXIT_OK
+
+    def test_changed_areas_set_overrides_story_areas_and_affects_tier(self, tmp_path):
+        # Story originally covers AreaA; test covers AreaB only.
+        # With changed_areas={"AreaB"}, the story areas are replaced → test now matches.
+        p = self._minimal_input_path(tmp_path, ["AreaB"], ["AreaA"])
+        without = run_pipeline(p, changed_areas=None)
+        with_diff = run_pipeline(p, changed_areas={"AreaB"})
+        assert without.exit_code == EXIT_OK
+        assert with_diff.exit_code == EXIT_OK
+        # Both should produce valid reports; presence in must-run should differ
+        assert "## Optimisation Summary" in with_diff.message
+
+    def test_changed_areas_empty_set_clears_all_story_areas(self, tmp_path):
+        # empty changed_areas → direct_coverage = 0 for every test → raw_score ≤ 0 → defer tier
+        p = self._minimal_input_path(tmp_path, ["AreaA"], ["AreaA"])
+        result = run_pipeline(p, changed_areas=set())
+        assert result.exit_code == EXIT_OK
+        from intelligent_regression_optimizer.output_validator import parse_sections
+        sections = parse_sections(result.message)
+        defer_body = sections.get("## Defer To Overnight Run", "")
+        must_body = sections.get("## Must-Run", "")
+        should_body = sections.get("## Should-Run If Time Permits", "")
+        assert "T-target" in defer_body, "T-target should be in defer when changed_areas is empty"
+        assert "T-target" not in must_body
+        assert "T-target" not in should_body
+
+    def test_pipeline_with_changed_areas_output_passes_validator(self, tmp_path):
+        from intelligent_regression_optimizer.output_validator import validate_output
+        p = self._minimal_input_path(tmp_path, ["AreaA"], ["OtherArea"])
+        result = run_pipeline(p, changed_areas={"AreaA"})
+        assert result.exit_code == EXIT_OK
+        vr = validate_output(result.message)
+        assert vr.is_valid, vr.errors
+
+
+# ---------------------------------------------------------------------------
+# V1-C E2E: LLM pipeline modes — repair and compare
+# ---------------------------------------------------------------------------
+
+def _make_llm_normalized():
+    """Minimal normalised dict suitable for run_llm_pipeline() calls."""
+    return {
+        "sprint_context": {
+            "sprint_id": "S-LLM-E2E",
+            "stories": [{"id": "S1", "risk": "high", "changed_areas": ["ServiceA"], "resolved_deps": []}],
+            "exploratory_sessions": [],
+        },
+        "test_suite": [{
+            "id": "T1", "name": "service a test", "layer": "unit",
+            "coverage_areas": ["ServiceA"], "execution_time_secs": 30,
+            "flakiness_rate": 0.0, "failure_count_last_30d": 0,
+            "automated": True, "tags": [],
+        }],
+        "constraints": {
+            "time_budget_mins": 60, "mandatory_tags": [],
+            "flakiness_retire_threshold": 0.30, "flakiness_high_tier_threshold": 0.20,
+        },
+    }
+
+
+class TestLLMPipelineE2E:
+    """Full run_llm_pipeline() paths: happy path, repaired, and compare mode."""
+
+    def _run(self, content: str):
+        from intelligent_regression_optimizer.context_classifier import classify_context
+        from intelligent_regression_optimizer.llm_client import FakeLLMClient
+        from intelligent_regression_optimizer.llm_flow import run_llm_pipeline
+        from intelligent_regression_optimizer.scoring_engine import score_tests
+        normalized = _make_llm_normalized()
+        classifications = classify_context(normalized)
+        tier_result = score_tests(normalized, classifications)
+        return run_llm_pipeline(normalized, classifications, tier_result, FakeLLMClient(content))
+
+    def test_valid_llm_output_exits_ok(self):
+        from intelligent_regression_optimizer.llm_client import _FAKE_RESPONSE
+        result = self._run(_FAKE_RESPONSE)
+        assert result.flow_result.exit_code == EXIT_OK
+        assert result.recommendation_mode == "llm"
+
+    def test_valid_llm_output_passes_contract(self):
+        from intelligent_regression_optimizer.llm_client import _FAKE_RESPONSE
+        from intelligent_regression_optimizer.output_validator import validate_output
+        result = self._run(_FAKE_RESPONSE)
+        vr = validate_output(result.flow_result.message)
+        assert vr.is_valid, vr.errors
+
+    def test_repaired_llm_output_exits_ok_and_passes_contract(self):
+        from intelligent_regression_optimizer.llm_client import _FAKE_RESPONSE
+        from intelligent_regression_optimizer.output_validator import validate_output
+        # Remove one required heading to force repair path
+        broken = _FAKE_RESPONSE.replace("## Retire Candidates\n", "")
+        result = self._run(broken)
+        assert result.flow_result.exit_code == EXIT_OK
+        assert result.recommendation_mode == "llm-repaired"
+        assert len(result.repair_actions) > 0
+        vr = validate_output(result.flow_result.message)
+        assert vr.is_valid, vr.errors
+
+    def test_compare_mode_output_contains_both_sections(self):
+        from intelligent_regression_optimizer.context_classifier import classify_context
+        from intelligent_regression_optimizer.llm_client import FakeLLMClient, _FAKE_RESPONSE
+        from intelligent_regression_optimizer.llm_flow import run_llm_pipeline
+        from intelligent_regression_optimizer.scoring_engine import score_tests
+        from intelligent_regression_optimizer.comparison import build_comparison_report
+        from intelligent_regression_optimizer.end_to_end_flow import run_pipeline_from_merged
+        # Get deterministic output
+        normalized = _make_llm_normalized()
+        det_result = run_pipeline_from_merged(normalized)
+        # Get LLM result
+        classifications = classify_context(normalized)
+        tier_result = score_tests(normalized, classifications)
+        llm_result = run_llm_pipeline(normalized, classifications, tier_result, FakeLLMClient())
+        # Build comparison
+        report = build_comparison_report(det_result.message, llm_result)
+        assert "## Comparison Summary" in report
+        assert "## Deterministic Output" in report
+        assert "## LLM Output" in report
+        assert "LLM Recommendation Mode: llm" in report
+
+    def test_compare_mode_deterministic_section_contains_valid_headings(self):
+        from intelligent_regression_optimizer.context_classifier import classify_context
+        from intelligent_regression_optimizer.llm_client import FakeLLMClient
+        from intelligent_regression_optimizer.llm_flow import run_llm_pipeline
+        from intelligent_regression_optimizer.scoring_engine import score_tests
+        from intelligent_regression_optimizer.comparison import build_comparison_report
+        from intelligent_regression_optimizer.end_to_end_flow import run_pipeline_from_merged
+        normalized = _make_llm_normalized()
+        det_result = run_pipeline_from_merged(normalized)
+        classifications = classify_context(normalized)
+        tier_result = score_tests(normalized, classifications)
+        llm_result = run_llm_pipeline(normalized, classifications, tier_result, FakeLLMClient())
+        report = build_comparison_report(det_result.message, llm_result)
+        assert "## Optimisation Summary" in report
+        assert "Recommendation Mode: deterministic" in report

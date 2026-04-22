@@ -9,7 +9,7 @@ from intelligent_regression_optimizer.output_validator import (
     LABEL_SECTION_MAP,
     REQUIRED_HEADINGS,
     REQUIRED_LABELS,
-    _parse_sections,
+    parse_sections,
 )
 
 
@@ -78,7 +78,7 @@ def repair_output(
     # --- 2. Fix each label (absent / misplaced / duplicate) -----------------
     for label in REQUIRED_LABELS:
         target_section = LABEL_SECTION_MAP[label]
-        sections = _parse_sections(markdown)
+        sections = parse_sections(markdown)
 
         in_correct = label in sections.get(target_section, "")
         in_wrong = [h for h, body in sections.items() if h != target_section and label in body]

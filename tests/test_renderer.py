@@ -6,7 +6,7 @@ from intelligent_regression_optimizer.output_validator import (
     REQUIRED_HEADINGS,
     REQUIRED_LABELS,
     LABEL_SECTION_MAP,
-    _parse_sections,
+    parse_sections,
 )
 from intelligent_regression_optimizer.renderer import render_report
 
@@ -111,7 +111,7 @@ class TestRequiredLabels:
         classifications = _base_classifications()
         tier = _tier_result()
         output = render_report(normalized, classifications, tier)
-        sections = _parse_sections(output)
+        sections = parse_sections(output)
         for label, required_section in LABEL_SECTION_MAP.items():
             section_body = sections.get(required_section, "")
             assert label in section_body, \
@@ -186,7 +186,7 @@ class TestTierSectionContent:
             should_run=[_scored("T2", name="secondary test", score=5.0, tier="should-run")],
         )
         output = render_report(normalized, classifications, tier)
-        sections = _parse_sections(output)
+        sections = parse_sections(output)
         must_body = sections.get("## Must-Run", "")
         should_body = sections.get("## Should-Run If Time Permits", "")
         assert "T1" in must_body
@@ -200,7 +200,7 @@ class TestTierSectionContent:
             retire=[_scored("T99", name="legacy smoke", score=-4.0, tier="retire")]
         )
         output = render_report(normalized, classifications, tier)
-        sections = _parse_sections(output)
+        sections = parse_sections(output)
         retire_body = sections.get("## Retire Candidates", "")
         assert "T99" in retire_body
 
@@ -215,7 +215,7 @@ class TestSuiteHealthSummary:
         classifications = _base_classifications()
         tier = _tier_result()
         output = render_report(normalized, classifications, tier)
-        sections = _parse_sections(output)
+        sections = parse_sections(output)
         health_body = sections.get("## Suite Health Summary", "")
         # Should mention something about flakiness tier high count
         assert "Flakiness Tier High:" in health_body
