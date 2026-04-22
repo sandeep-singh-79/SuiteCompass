@@ -194,3 +194,27 @@ def test_llm_mode_output_to_file(input_file, tmp_path):
         ], env={"IRO_LLM_API_KEY": "test-key"}, catch_exceptions=False)
     assert out_file.exists()
     assert "LLM report to file" in out_file.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Provider exception — CLI must exit 0 with deterministic fallback report
+# ---------------------------------------------------------------------------
+
+def test_provider_exception_in_llm_mode_exits_ok_with_fallback(input_file):
+    """Even if the LLM provider raises, the CLI must exit 0 with a deterministic fallback."""
+    from intelligent_regression_optimizer.llm_flow import LLMFlowResult
+    from intelligent_regression_optimizer.models import FlowResult
+    # Simulate the new fallback-on-exception behavior from run_llm_pipeline
+    fake_fallback = LLMFlowResult(
+        flow_result=FlowResult(exit_code=EXIT_OK, message="Fallback report", output_path=None),
+        recommendation_mode="deterministic-fallback",
+        raw_llm_output=None,
+        repair_actions=["Provider error: Network unreachable"],
+    )
+    with patch("intelligent_regression_optimizer.cli.run_llm_pipeline", return_value=fake_fallback):
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "run", input_file, "--mode", "llm", "--provider", "ollama",
+        ], catch_exceptions=False)
+    assert result.exit_code == EXIT_OK
+    assert "Fallback report" in result.output

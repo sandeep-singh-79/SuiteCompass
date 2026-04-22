@@ -57,21 +57,21 @@ def load_llm_config(
             config[k] = v
 
     # Layer 3: env vars
-    for env_key, field in _ENV_MAP.items():
+    for env_key, config_key in _ENV_MAP.items():
         val = os.environ.get(env_key)
         if val is not None:
-            if field == "temperature":
-                config[field] = float(val)
-            elif field == "max_tokens":
-                config[field] = int(val)
+            if config_key == "temperature":
+                config[config_key] = float(val)
+            elif config_key == "max_tokens":
+                config[config_key] = int(val)
             else:
-                config[field] = val
+                config[config_key] = val
 
     # Layer 4: CLI overrides (None values are ignored — no override)
     if cli_overrides:
-        for field, val in cli_overrides.items():
+        for config_key, val in cli_overrides.items():
             if val is not None:
-                config[field] = val
+                config[config_key] = val
 
     return ProviderConfig(
         provider=config["provider"],

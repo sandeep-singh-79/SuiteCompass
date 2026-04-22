@@ -1,7 +1,10 @@
 """LLM client Protocol and FakeLLMClient for testing."""
 from __future__ import annotations
 
+import json
+import urllib.request
 from typing import Protocol, runtime_checkable
+from urllib.error import HTTPError
 
 from intelligent_regression_optimizer.models import (
     GenerationRequest,
@@ -22,7 +25,16 @@ Total Retire Candidates: 0
 NFR Elevation: No
 Budget Overflow: No
 
+This sprint targets medium-risk changes. The LLM analysis confirms that focused
+regression coverage is sufficient, with one test elevated to must-run based on
+its direct coverage of the modified area and its historically strong signal.
+
 ## Must-Run
+
+T-01 covers the core integration path that was directly changed in this sprint.
+This test must execute before any sign-off because a regression here would
+affect every downstream consumer. Its coverage of the primary data flow makes
+it the single highest-priority item in the current run budget.
 
 - T-01 Sample test (score: 9.0)
 
@@ -43,6 +55,8 @@ _No retire candidates._
 Flakiness Tier High: 0 tests above threshold
 Total automated execution time (must-run): 2 min
 Time budget: 60 min
+Suite stability is strong. No flaky tests were detected above the high-tier
+threshold. No remediation actions are required for the current sprint cycle.
 """
 
 
@@ -66,3 +80,28 @@ class FakeLLMClient:
             model="fake",
             provider="fake",
         )
+
+
+# ---------------------------------------------------------------------------
+# Shared HTTP helper for provider clients (package-internal)
+# ---------------------------------------------------------------------------
+
+_TIMEOUT: int = 300
+
+
+def _post_json(
+    url: str, payload: bytes, headers: dict[str, str], provider_name: str
+) -> dict:
+    """POST payload to url and return parsed JSON response.
+
+    Raises RuntimeError with the HTTP status on non-2xx responses.
+    Internal utility shared by provider clients; not part of the public API.
+    """
+    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            return json.loads(resp.read())
+    except HTTPError as exc:
+        raise RuntimeError(
+            f"{provider_name} request failed: HTTP {exc.code} {exc.reason}"
+        ) from exc

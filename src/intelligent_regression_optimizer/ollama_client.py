@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import json
-import urllib.request
-from urllib.error import HTTPError
 
+from intelligent_regression_optimizer.llm_client import _post_json
 from intelligent_regression_optimizer.models import (
     GenerationRequest,
     GenerationResponse,
@@ -12,7 +11,6 @@ from intelligent_regression_optimizer.models import (
 )
 
 _DEFAULT_BASE_URL = "http://localhost:11434"
-_TIMEOUT = 300
 
 
 class OllamaClient:
@@ -33,17 +31,12 @@ class OllamaClient:
         }).encode()
 
         url = f"{self._base_url}/api/generate"
-        req = urllib.request.Request(
+        data = _post_json(
             url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
+            payload,
+            {"Content-Type": "application/json"},
+            "Ollama",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-        except HTTPError as exc:
-            raise RuntimeError(f"Ollama request failed: HTTP {exc.code} {exc.reason}") from exc
 
         return GenerationResponse(
             content=data["response"],

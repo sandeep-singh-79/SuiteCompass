@@ -113,7 +113,6 @@ class GenerationRequest:
 
     system_prompt: str
     user_prompt: str
-    config: ProviderConfig
 
 
 @dataclass(slots=True)

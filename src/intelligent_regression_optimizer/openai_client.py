@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import json
-import urllib.request
-from urllib.error import HTTPError
 
+from intelligent_regression_optimizer.llm_client import _post_json
 from intelligent_regression_optimizer.models import (
     GenerationRequest,
     GenerationResponse,
@@ -12,7 +11,6 @@ from intelligent_regression_optimizer.models import (
 )
 
 _DEFAULT_BASE_URL = "https://api.openai.com"
-_TIMEOUT = 300
 
 
 class OpenAIClient:
@@ -35,20 +33,15 @@ class OpenAIClient:
         }).encode()
 
         url = f"{self._base_url}/v1/chat/completions"
-        req = urllib.request.Request(
+        data = _post_json(
             url,
-            data=payload,
-            headers={
+            payload,
+            {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self._config.api_key}",
             },
-            method="POST",
+            "OpenAI",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-        except HTTPError as exc:
-            raise RuntimeError(f"OpenAI request failed: HTTP {exc.code} {exc.reason}") from exc
 
         content = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {})

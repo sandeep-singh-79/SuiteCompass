@@ -6,10 +6,9 @@ from typing import Any
 
 from intelligent_regression_optimizer.llm_client import LLMClient
 from intelligent_regression_optimizer.models import (
-    EXIT_GENERATION_ERROR,
     EXIT_OK,
     FlowResult,
-    ProviderConfig,
+    GenerationRequest,
     TierResult,
 )
 from intelligent_regression_optimizer.output_validator import validate_output
@@ -43,33 +42,24 @@ def run_llm_pipeline(
     5. If still invalid: fall back to deterministic renderer.
     Returns LLMFlowResult with appropriate recommendation_mode.
     """
-    from intelligent_regression_optimizer.models import GenerationRequest, ProviderConfig
-
     # Step 1: build prompt
     system_prompt, user_prompt = build_prompt(normalized, classifications, tier_result)
 
-    # Construct a minimal config to carry the request (provider details live in the client)
-    dummy_config = ProviderConfig(
-        provider="", model="", base_url=None, api_key=None, temperature=0.3, max_tokens=4096,
-    )
     request = GenerationRequest(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        config=dummy_config,
     )
 
     # Step 2: generate
     try:
         response = client.generate(request)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
+        fallback_md = _deterministic_fallback(normalized, classifications, tier_result)
         return LLMFlowResult(
-            flow_result=FlowResult(
-                exit_code=EXIT_GENERATION_ERROR,
-                message=str(exc),
-                output_path=None,
-            ),
-            recommendation_mode="error",
+            flow_result=FlowResult(exit_code=EXIT_OK, message=fallback_md, output_path=None),
+            recommendation_mode="deterministic-fallback",
             raw_llm_output=None,
+            repair_actions=[f"Provider error: {exc}"],
         )
 
     raw_output = response.content

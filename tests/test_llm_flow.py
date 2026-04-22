@@ -5,7 +5,6 @@ import pytest
 
 from intelligent_regression_optimizer.llm_client import FakeLLMClient
 from intelligent_regression_optimizer.models import (
-    EXIT_GENERATION_ERROR,
     EXIT_OK,
     GenerationRequest,
     GenerationResponse,
@@ -145,7 +144,7 @@ def test_fallback_path_output_passes_contract():
 
 
 # ---------------------------------------------------------------------------
-# Generation error path
+# Generation error path — provider exceptions must produce deterministic fallback (exit 0)
 # ---------------------------------------------------------------------------
 
 class ErrorClient:
@@ -153,19 +152,38 @@ class ErrorClient:
         raise RuntimeError("Connection timeout")
 
 
-def test_generation_error_returns_exit_3():
+def test_generation_error_returns_exit_ok():
+    """Provider exceptions must not leak as exit 3; fallback to deterministic output."""
     result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
-    assert result.flow_result.exit_code == EXIT_GENERATION_ERROR
+    assert result.flow_result.exit_code == EXIT_OK
 
 
-def test_generation_error_message_contains_detail():
+def test_generation_error_recommendation_mode_is_deterministic_fallback():
     result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
-    assert "Connection timeout" in result.flow_result.message
+    assert result.recommendation_mode == "deterministic-fallback"
+
+
+def test_generation_error_detail_preserved_in_repair_actions():
+    """Exception message must not be silently dropped — it surfaces in repair_actions."""
+    result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
+    assert any("Connection timeout" in a for a in result.repair_actions)
 
 
 def test_generation_error_raw_output_is_none():
     result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
     assert result.raw_llm_output is None
+
+
+def test_generation_error_output_passes_contract():
+    from intelligent_regression_optimizer.output_validator import validate_output
+    result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
+    vr = validate_output(result.flow_result.message)
+    assert vr.is_valid, vr.errors
+
+
+def test_generation_error_report_contains_fallback_mode_label():
+    result = run_llm_pipeline(_base_normalized(), _make_classifications(), _make_tier_result(), ErrorClient())
+    assert "Recommendation Mode: deterministic-fallback" in result.flow_result.message
 
 
 # ---------------------------------------------------------------------------

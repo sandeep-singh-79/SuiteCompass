@@ -59,18 +59,12 @@ def test_provider_config_with_base_url():
 # ---------------------------------------------------------------------------
 
 def test_generation_request_fields():
-    cfg = ProviderConfig(
-        provider="openai", model="gpt-4o", base_url=None,
-        api_key="key", temperature=0.3, max_tokens=4096,
-    )
     req = GenerationRequest(
         system_prompt="You are a helpful assistant.",
         user_prompt="Explain the test results.",
-        config=cfg,
     )
     assert req.system_prompt == "You are a helpful assistant."
     assert req.user_prompt == "Explain the test results."
-    assert req.config is cfg
 
 
 # ---------------------------------------------------------------------------
@@ -112,12 +106,8 @@ def test_fake_llm_client_satisfies_protocol():
 
 
 def test_fake_llm_client_generate_returns_response():
-    cfg = ProviderConfig(
-        provider="openai", model="gpt-4o", base_url=None,
-        api_key=None, temperature=0.3, max_tokens=4096,
-    )
     req = GenerationRequest(
-        system_prompt="sys", user_prompt="usr", config=cfg,
+        system_prompt="sys", user_prompt="usr",
     )
     client = FakeLLMClient()
     resp = client.generate(req)
@@ -127,11 +117,7 @@ def test_fake_llm_client_generate_returns_response():
 
 
 def test_fake_llm_client_default_response_passes_output_contract():
-    cfg = ProviderConfig(
-        provider="openai", model="gpt-4o", base_url=None,
-        api_key=None, temperature=0.3, max_tokens=4096,
-    )
-    req = GenerationRequest(system_prompt="sys", user_prompt="usr", config=cfg)
+    req = GenerationRequest(system_prompt="sys", user_prompt="usr")
     client = FakeLLMClient()
     resp = client.generate(req)
     result = validate_output(resp.content)
@@ -140,21 +126,13 @@ def test_fake_llm_client_default_response_passes_output_contract():
 
 def test_fake_llm_client_custom_response():
     custom = "## Optimisation Summary\n\nRecommendation Mode: llm\nSprint Risk Level: high\nTotal Must-Run: 1\nTotal Retire Candidates: 0\nNFR Elevation: No\nBudget Overflow: No\n\n## Must-Run\n\n- T-01 Login test (score: 9.0)\n\n## Should-Run If Time Permits\n\n_No tests in this tier._\n\n## Defer To Overnight Run\n\n_No tests in this tier._\n\n## Retire Candidates\n\n_No retire candidates._\n\n## Suite Health Summary\n\nFlakiness Tier High: 0 tests above threshold\nTotal automated execution time (must-run): 5 min\nTime budget: 60 min\n"
-    cfg = ProviderConfig(
-        provider="openai", model="gpt-4o", base_url=None,
-        api_key=None, temperature=0.3, max_tokens=4096,
-    )
-    req = GenerationRequest(system_prompt="sys", user_prompt="usr", config=cfg)
+    req = GenerationRequest(system_prompt="sys", user_prompt="usr")
     client = FakeLLMClient(response_content=custom)
     resp = client.generate(req)
     assert resp.content == custom
 
 
 def test_fake_llm_client_default_response_contains_llm_mode():
-    cfg = ProviderConfig(
-        provider="openai", model="gpt-4o", base_url=None,
-        api_key=None, temperature=0.3, max_tokens=4096,
-    )
-    req = GenerationRequest(system_prompt="sys", user_prompt="usr", config=cfg)
+    req = GenerationRequest(system_prompt="sys", user_prompt="usr")
     resp = FakeLLMClient().generate(req)
     assert "Recommendation Mode: llm" in resp.content

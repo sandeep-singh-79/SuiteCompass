@@ -25,11 +25,10 @@ def _make_config(provider: str, api_key: str | None = "test-key", base_url: str 
     )
 
 
-def _make_request(config: ProviderConfig) -> GenerationRequest:
+def _make_request() -> GenerationRequest:
     return GenerationRequest(
         system_prompt="You are a test assistant.",
         user_prompt="Produce a report.",
-        config=config,
     )
 
 
@@ -46,7 +45,7 @@ class TestOpenAIClient:
     def test_generate_returns_response(self):
         from intelligent_regression_optimizer.openai_client import OpenAIClient
         cfg = _make_config("openai")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {
             "choices": [{"message": {"content": "Hello"}}],
             "model": "test-model",
@@ -69,12 +68,12 @@ class TestOpenAIClient:
         from intelligent_regression_optimizer.openai_client import OpenAIClient
         cfg = _make_config("openai", api_key=None)
         with pytest.raises(ValueError, match="API key"):
-            OpenAIClient(cfg).generate(_make_request(cfg))
+            OpenAIClient(cfg).generate(_make_request())
 
     def test_uses_bearer_auth_header(self):
         from intelligent_regression_optimizer.openai_client import OpenAIClient
         cfg = _make_config("openai", api_key="sk-secret")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {
             "choices": [{"message": {"content": "ok"}}],
             "model": "test-model",
@@ -105,7 +104,7 @@ class TestOpenAIClient:
             url="http://x", code=500, msg="Server Error", hdrs=None, fp=None
         )):
             with pytest.raises(RuntimeError, match="500"):
-                OpenAIClient(cfg).generate(_make_request(cfg))
+                OpenAIClient(cfg).generate(_make_request())
 
     def test_default_base_url(self):
         from intelligent_regression_optimizer.openai_client import OpenAIClient
@@ -127,7 +126,7 @@ class TestOllamaClient:
     def test_generate_returns_response(self):
         from intelligent_regression_optimizer.ollama_client import OllamaClient
         cfg = _make_config("ollama", api_key=None, base_url="http://localhost:11434")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {"response": "Hello from ollama", "model": "test-model"}
         with patch("urllib.request.urlopen") as mock_open:
             mock_cm = MagicMock()
@@ -144,7 +143,7 @@ class TestOllamaClient:
     def test_no_auth_header(self):
         from intelligent_regression_optimizer.ollama_client import OllamaClient
         cfg = _make_config("ollama", api_key=None, base_url="http://localhost:11434")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {"response": "ok", "model": "test-model"}
         captured = {}
         with patch("urllib.request.urlopen") as mock_open:
@@ -169,7 +168,7 @@ class TestOllamaClient:
             url="http://x", code=503, msg="Unavailable", hdrs=None, fp=None
         )):
             with pytest.raises(RuntimeError, match="503"):
-                OllamaClient(cfg).generate(_make_request(cfg))
+                OllamaClient(cfg).generate(_make_request())
 
     def test_default_base_url(self):
         from intelligent_regression_optimizer.ollama_client import OllamaClient
@@ -191,7 +190,7 @@ class TestGeminiClient:
     def test_generate_returns_response(self):
         from intelligent_regression_optimizer.gemini_client import GeminiClient
         cfg = _make_config("gemini", api_key="gemini-key")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {
             "candidates": [{"content": {"parts": [{"text": "Hello from Gemini"}]}}],
             "usageMetadata": {"promptTokenCount": 8, "candidatesTokenCount": 4},
@@ -213,12 +212,12 @@ class TestGeminiClient:
         from intelligent_regression_optimizer.gemini_client import GeminiClient
         cfg = _make_config("gemini", api_key=None)
         with pytest.raises(ValueError, match="API key"):
-            GeminiClient(cfg).generate(_make_request(cfg))
+            GeminiClient(cfg).generate(_make_request())
 
     def test_api_key_in_url_not_header(self):
         from intelligent_regression_optimizer.gemini_client import GeminiClient
         cfg = _make_config("gemini", api_key="my-gemini-key")
-        req = _make_request(cfg)
+        req = _make_request()
         mock_resp = {
             "candidates": [{"content": {"parts": [{"text": "ok"}]}}],
             "usageMetadata": {},
@@ -248,4 +247,4 @@ class TestGeminiClient:
             url="http://x", code=401, msg="Unauthorized", hdrs=None, fp=None
         )):
             with pytest.raises(RuntimeError, match="401"):
-                GeminiClient(cfg).generate(_make_request(cfg))
+                GeminiClient(cfg).generate(_make_request())
