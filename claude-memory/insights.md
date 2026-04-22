@@ -49,3 +49,15 @@ Reusable lessons and engineering rules for the `intelligent-regression-optimizer
 
 20. **Coverage ≥ 90% per module is a module-level gate, not an aggregate.** A 95% project average can hide an 0%-covered new module. Measure coverage per module after each sub-phase and block progression if any module is below threshold.
 
+21. **Help text, implementation, and tests form a contract triangle — all three must agree.** If any one diverges, the inconsistency lives invisibly. Stale help text that describes a `HEAD~1` default when the implementation requires explicit `--ref` misleads users and creates dead code. When adding a flag, write the help string, implementation, and at least one targeted test in the same commit.
+
+22. **Carry warnings in the return type, not only in logs.** When a pipeline function discards warnings internally (e.g. `result, _ = merge_history(...)`), callers lose the ability to surface them to the user or assert on them in tests. Adding a `warnings: list[str]` field to `FlowResult` made the CLI, tests, and documentation all composable around warnings. Rule: if a function produces user-visible diagnostic information, put it in the return value, not just stderr.
+
+23. **Scope reconciliation: narrow the documented contract before expanding the implementation.** When implementation delivers less than a plan promised (e.g. suite-level timestamps instead of testcase-level), the right first question is "can the narrowed scope satisfy users?" If yes, update the docs and plan to match the implementation — don't speculatively implement the harder case. Simpler implementation + honest docs beats ambitious docs + risky code.
+
+24. **A behaviour-change benchmark must prove the recommendation shifts in both directions.** A benchmark that only shows history *causing* a retire recommendation proves history can demote tests — it doesn't prove history can *save* a test from incorrect retirement. Include one test per direction: YAML says safe but history says flaky → retire; YAML says flaky but history says stable → should-run. Both directions in one benchmark eliminates the possibility of a one-sided implementation.
+
+25. **Pre-increment branch review is a mandatory gate, not optional polish.** Reviewing V1-A/V1-B before starting V1-C found 5 real gaps (silent override, contract mismatch, stale docs, missing benchmark, scope drift). Without the review those gaps would have become V1-C's inherited baseline. Rule: before starting the next increment, run a structured review of the current branch diff — implementation, tests, docs, governance — and produce written findings. Only start the next increment when the findings are resolved or explicitly deferred with reasons.
+
+26. **Don't assume library API stability — verify the signature before writing tests.** `CliRunner(mix_stderr=False)` was valid in Click 8.1 but the constructor in Click 8.3 dropped it. Writing tests against an assumed API and discovering the failure only at runtime wastes a test-design iteration. Check `inspect.signature()` or the installed version before using unfamiliar constructor kwargs.
+
