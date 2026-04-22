@@ -10,6 +10,22 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ## Open Questions
 - None at session start.
 
+## Pre-Seal Review Findings (2026-04-22) — RESOLVED
+- Scope reviewed: V1-C implementation and recent hardening changes, judged against plan.md as authority.
+- Deterministic V1-A/V1-B behavior remains green: targeted review suite 111 passed; full suite 542 passed.
+- All 6 blocking tracks (R1-R6) resolved in remediation session (2026-04-22):
+	- R1 (provider exceptions exit 0 via fallback): DONE
+	- R2 (--summary-only mode): DONE
+	- R3 (prompt override reasons + history provenance): DONE
+	- R4 (min_section_word_count narrative assertions): DONE
+	- R5 (vacuous or-True assertion fixed): DONE
+	- R6 (plan/docs reconciled — llm_assisted → llm, SUITECOMPASS → IRO, exit-3 removed): DONE
+- Full-suite gate passed after remediation: 562 tests, 96.47% coverage.
+- Follow-up review found two remaining drift issues and they were corrected in the same session:
+	- README and USAGE-GUIDE exit-code tables no longer advertise exit 3 for LLM provider exceptions.
+	- LEARNING-GUIDE diff-areas examples now include the required `--ref HEAD~1` argument.
+- Next: merge/tag or final acceptance review before release.
+
 ## Coverage Notes (V1-A sealed)
 Known unreachable/pre-existing lines that don't warrant tests:
 - `junit_xml_parser.py` line 116: `_compute_flakiness_rate` `total == 0` guard — unreachable from public API (accumulator never produces empty entry lists)
@@ -30,10 +46,10 @@ Known unreachable/pre-existing lines that don't warrant tests:
 | B1 | area-map.yaml config + diff_mapper.py (fnmatch) | Complete — 35 tests, 100% coverage, commit 095bddc |
 | B2 | iro diff-areas subcommand + iro run integration | Complete — 394 tests (19 new), 97.18% coverage, commit 9fedd32 |
 | B3 | Phase B hardening | Complete — area-map.yaml template, USAGE-GUIDE Workflows 4+5, V1-INPUT-TEMPLATE area-map schema, commit 58e2542 |
-| C1 | LLM client infra copy-adapt from QEStrategyForge | Not started |
-| C2 | prompt_builder.py + prompts/v1/ templates | Not started |
-| C3 | llm_flow.py + repair/fallback + comparison.py | Not started |
-| C4 | --mode / --provider / --model CLI flags + live tests | Not started |
+| C1 | LLM client infra copy-adapt from QEStrategyForge | Complete — llm_client, openai/ollama/gemini clients, config_loader, client_factory |
+| C2 | prompt_builder.py + prompts/v1/ templates | Complete — template_loader, 5 prompt templates, prompt_builder with scenario routing |
+| C3 | llm_flow.py + repair/fallback + comparison.py | Complete — llm_flow, repair (4 strategies), comparison reporter |
+| C4 | --mode / --provider / --model CLI flags + live tests | Complete — 7 new CLI flags, LLM routing in run command |
 | C5 | Phase C hardening + LLM benchmark | Not started |
 | Seal | Version 1.0.0 bump, README, PHASED-IMPLEMENTATION retro, tag | Not started |
 

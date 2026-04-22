@@ -9,9 +9,8 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: V1-C execution plan written. 10 INVEST stories (C1-1 through C5-1) defined in docs/V1-C-EXECUTION-PLAN.md. Awaiting confirmation before implementation. V1-A/V1-B complete and remediated, 406 tests passing on `v1b-diff-mapper`.
+- Current stage: V1-A and V1-B remain complete and stable. V1-C implementation is feature-rich. Pre-seal review was conducted and all 6 blocking findings (R1-R5, R6) were resolved in a remediation session. R1: provider exceptions now fall back to deterministic output (exit 0). R2: --summary-only mode implemented. R3: prompt builder now includes override reasons and history provenance. R4: benchmark runner has min_section_word_count assertion type and FakeLLMClient has narrative content. R5: vacuous assertion fixed. R6: plan/docs updated to remove exit-3 and llm_assisted references. Full regression passed: 562 tests, 96.47% coverage. Next: merge/tag or final acceptance review.
 - Active branch: `v1b-diff-mapper`.
-- Decision pending: merge `v1b-diff-mapper` to master before creating `v1c-llm-narrative`, or branch from `v1b-diff-mapper` directly.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 

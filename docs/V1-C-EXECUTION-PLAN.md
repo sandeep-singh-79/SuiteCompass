@@ -1,8 +1,8 @@
 # V1-C Execution Plan: LLM Narrative Layer
 
-> **Status:** DRAFT — awaiting confirmation before implementation  
-> **Depends on:** V1-A (history overlay) + V1-B (diff mapper) — both complete, 406 tests passing  
-> **Branch strategy:** Create `v1c-llm-narrative` from current `v1b-diff-mapper`  
+> **Status:** Implemented — retained as execution record  
+> **Depends on:** V1-A (history overlay) + V1-B (diff mapper) — both complete  
+> **Branch strategy:** Implemented from `v1b-diff-mapper`  
 > **Goal:** Add an LLM-powered mode that wraps the deterministic scoring results in a contextual narrative report, with structural repair, deterministic fallback, and comparison mode.
 
 ---
@@ -12,7 +12,7 @@
 1. **Deterministic core is ground truth.** The LLM does not replace scoring — it narrates the deterministic results. Every fact in the LLM output must trace back to a deterministic tier assignment or classification.
 2. **Reuse-first from QEStrategyForge.** Copy-adapt proven LLM modules (Protocol, factory, config loader, provider clients, prompt builder, repair chain). Divergence from QEStrategyForge requires a written reason.
 3. **Output contract preserved.** The LLM output must pass the same `validate_output()` checks: 6 headings, 7 labels, section-aware placement. The LLM adds narrative prose around the structural skeleton.
-4. **Repair before fallback before failure.** Chain: LLM raw → structural repair → validate → if still invalid, deterministic fallback → if somehow that fails too, exit 3.
+4. **Repair before fallback before failure.** Chain: LLM raw → structural repair → validate → if still invalid, deterministic fallback. Provider exceptions are treated as recoverable and also fall back to deterministic output.
 5. **No new external dependencies.** All HTTP via `urllib.request` (stdlib). No `openai`, `httpx`, or `requests`.
 6. **API keys from env vars only.** Config files may set provider/model/base-url but never API keys. Enforced by `_FORBIDDEN_FILE_KEYS`.
 
@@ -23,7 +23,7 @@
 | Decision | Value | Reason |
 |---|---|---|
 | Env var prefix | `IRO_LLM_` | Matches CLI name `iro`; short, distinct |
-| Exit code for generation errors | `EXIT_GENERATION_ERROR = 3` | Extends existing 0/1/2 scheme; matches QEStrategyForge convention |
+| Exit code behavior on provider exceptions | Deterministic fallback, exit 0 | Provider failures are recoverable in shipped behavior; CI should still receive a valid report |
 | Recommendation Mode values | `deterministic` / `llm` / `llm-repaired` / `deterministic-fallback` | User can see exactly which path produced the output |
 | Prompt scenario routing key | `classifications` dict | Reuse existing `classify_context()` output — sprint_risk_level, suite_health, time_pressure |
 | Scenario templates | `high_risk`, `degraded_suite`, `budget_pressure`, `balanced` | Map from classification combinations; simpler than QEStrategyForge's 4 scenarios |
@@ -84,8 +84,6 @@ C3-1 (LLM flow orchestration) ──┬──→ C3-2 (repair + fallback)       
 
 ```python
 # models.py additions
-EXIT_GENERATION_ERROR: int = 3
-
 @dataclass(slots=True)
 class ProviderConfig:
     provider: str           # "openai" | "ollama" | "gemini"
@@ -99,7 +97,6 @@ class ProviderConfig:
 class GenerationRequest:
     system_prompt: str
     user_prompt: str
-    config: ProviderConfig
 
 @dataclass(slots=True)
 class GenerationResponse:
@@ -123,7 +120,6 @@ class FakeLLMClient:
 #### Acceptance Criteria
 
 - [ ] `ProviderConfig`, `GenerationRequest`, `GenerationResponse` are `@dataclass(slots=True)` in `models.py`
-- [ ] `EXIT_GENERATION_ERROR = 3` added to `models.py`
 - [ ] `LLMClient` is a `@runtime_checkable` Protocol in `llm_client.py`
 - [ ] `FakeLLMClient` implements `LLMClient` and returns a pre-computed valid SuiteCompass report
 - [ ] `isinstance(FakeLLMClient(), LLMClient)` returns `True`
@@ -766,6 +762,6 @@ New Click options on `iro run`:
 | LLM output wildly divergent from expected structure | Repair chain + deterministic fallback ensures valid output always |
 | Prompt templates too generic → low-value narrative | Embed deterministic tier assignments verbatim in prompt; LLM explains, not decides |
 | API key leak in config file | `_FORBIDDEN_FILE_KEYS` enforcement; tests verify rejection |
-| urllib timeout on slow providers | 300s timeout; generation error exit code 3; fallback path |
+| urllib timeout on slow providers | 300s timeout; deterministic fallback returns a valid report with exit 0 |
 | Template placeholder mismatch after schema changes | Insight #5: test that all `normalized` keys appear in prompt output |
 | Repair chain hides real LLM quality issues | `repair_actions` list preserved in LLMFlowResult; comparison mode surfaces raw vs repaired |

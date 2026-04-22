@@ -2,7 +2,7 @@
 
 > **Purpose:** Track the active planning and execution steps for the `intelligent-regression-optimizer` repository.
 > **Scope:** Session-specific or cycle-specific. Refresh as milestones move.
-> **Last Updated:** 2026-04-18
+> **Last Updated:** 2026-04-25
 
 ---
 
@@ -12,17 +12,17 @@
 |---|---|
 | Capability | intelligent-regression-optimizer |
 | Objective | MVP SEALED |
-| Current Phase | All phases (1 + 2 + 3) complete |
-| Current Focus | V1-C execution plan written (docs/V1-C-EXECUTION-PLAN.md). 10 INVEST stories defined (C1-1 through C5-1). Awaiting user confirmation before implementation. |
-| Last Updated | 2026-04-22 |
+| Current Phase | All phases (V1-A + V1-B + V1-C) complete |
+| Current Focus | Pre-seal review remediation complete. Provider-exception fallback, summary-only mode, prompt context enrichment, benchmark narrative assertions, vacuous-test cleanup, and doc reconciliation are all green. Full regression passed: 562 tests, 96.47% coverage. Next: merge/tag or run final acceptance review before release. |
+| Last Updated | 2026-04-25 |
 
 ---
 
 ## Active Remediation Plan
 
-> **Status:** Planned only. Do not start implementation until explicit user confirmation.
-> **Scope:** Critical and major fixes from the V1-A / V1-B review only.
-> **Execution rule:** Dependencies take precedence over ROI; every task follows red -> green -> refactor, targeted validation first, then full regression.
+> **Status:** Complete.
+> **Scope:** Review findings were implemented, validated, and folded back into docs and governance.
+> **Execution rule:** Completed using red -> green -> refactor, targeted validation per track, then full regression.
 
 ### Execution Order
 
@@ -33,6 +33,8 @@
 | R3 | JUnit timestamp rule reconciliation | Critical | Medium | None | **Complete** |
 | R4 | V1-A history benchmark artifact | Major | Medium | R2, R3 | **Complete** |
 | R5 | README + supporting doc catch-up | Major | Small-Medium | R1, R3, R4 | **Complete** |
+
+**Outcome:** All remediation tracks are complete and the full regression gate passed at 562 tests / 96.47% coverage. This section remains as historical record only.
 
 ### Track R1 - diff-areas Contract Alignment
 
@@ -496,7 +498,7 @@ Commit: `58e2542`
 #### Sub-phase C1: Client Infrastructure (copy-adapt)
 
 **TDD targets:**
-1. Copy-adapt from QEStrategyForge (rename env prefix to `SUITECOMPASS_LLM_*`):
+1. Copy-adapt from QEStrategyForge (rename env prefix to `IRO_LLM_*`):
    - `llm_client.py` — LLMClient Protocol, GenerationRequest, GenerationResponse
    - `ollama_client.py` — verbatim
    - `openai_client.py` — verbatim
@@ -547,10 +549,10 @@ Commit: `58e2542`
 
 **TDD targets:**
 1. Add CLI flags to `iro run`:
-   - `--mode deterministic|llm_assisted` (default: deterministic)
-   - `--provider ollama|openai|gemini` (required when mode=llm_assisted)
+   - `--mode deterministic|llm` (default: deterministic)
+   - `--provider ollama|openai|gemini` (required when mode=llm)
    - `--model <name>`
-   - `--summary-only` (only with mode=llm_assisted)
+   - `--summary-only` (available with any mode)
    - `--compare <output.md>` (side-by-side comparison)
 2. Wire composition root: CLI resolves config → creates client → calls `run_llm_pipeline()`
 3. Tests (~8): CLI flag wiring, mode validation, missing provider error, deterministic mode unchanged
@@ -574,8 +576,8 @@ Commit: `58e2542`
 **Verification:**
 - All tests pass
 - `iro run input.yaml --mode deterministic` — identical to v0.3.x
-- `iro run input.yaml --mode llm_assisted --provider ollama` — enhanced report with prose
-- `iro run input.yaml --mode llm_assisted --summary-only` — exec summary + original report
+- `iro run input.yaml --mode llm --provider ollama` — enhanced report with prose
+- `iro run input.yaml --mode llm --summary-only` — summary section of LLM-enhanced report
 - All modules ≥ 90% coverage
 
 ---

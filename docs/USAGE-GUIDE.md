@@ -281,6 +281,117 @@ The `--area-map` flag replaces `changed_areas` on **every story** in the input w
 
 ---
 
+## Workflow 6: LLM-Enhanced Report
+
+Generate a prose-enhanced report using an LLM provider. The deterministic scores and tier assignments remain unchanged — the LLM adds narrative explanations, not decisions. The output always satisfies the same structural contract regardless of which provider path is taken.
+
+### Prerequisites
+
+**Ollama (recommended for local/offline use):**
+
+```bash
+# Install and start Ollama — https://ollama.com
+ollama serve
+ollama pull llama3
+```
+
+**OpenAI:**
+
+```bash
+export IRO_LLM_API_KEY=sk-...
+```
+
+**Gemini:**
+
+```bash
+export IRO_LLM_API_KEY=AIza...
+```
+
+### Step 1 — Run in LLM mode
+
+```bash
+# Ollama (local, no API key needed)
+iro run input.yaml --mode llm --provider ollama --model llama3
+
+# OpenAI
+iro run input.yaml --mode llm --provider openai --model gpt-4o
+
+# Gemini
+iro run input.yaml --mode llm --provider gemini --model gemini-1.5-pro
+
+# Write to file
+iro run input.yaml --mode llm --provider ollama --model llama3 --output report.md
+
+# Split-file mode + LLM
+iro run --tests test_suite.yaml --sprint sprint.yaml --mode llm --provider ollama --model llama3
+```
+
+### Step 2 — Compare mode
+
+Run both pipelines and receive a side-by-side comparison in one command:
+
+```bash
+iro run input.yaml --mode compare --provider ollama --model llama3
+```
+
+Output structure:
+
+```
+## Comparison Summary
+
+LLM Recommendation Mode: llm
+Repairs Applied: 0
+
+## Deterministic Output
+
+<deterministic report>
+
+## LLM Output
+
+<llm report>
+```
+
+### Step 3 — Persistent configuration with a config file
+
+Store provider settings in `llm.yaml` (do not include `api_key` — use the env var):
+
+```yaml
+provider: ollama
+model: llama3
+base_url: http://localhost:11434
+temperature: 0.3
+max_tokens: 4096
+```
+
+```bash
+iro run input.yaml --mode llm --config llm.yaml
+```
+
+Config resolution order (last wins): defaults → config file → env vars → `--provider`/`--model`/`--temperature`/`--max-tokens` CLI flags.
+
+### Step 4 — Interpret the Recommendation Mode label
+
+The `Recommendation Mode:` label in the report header shows which path was taken:
+
+| Value | Meaning |
+|---|---|
+| `Recommendation Mode: llm` | LLM output passed validation; used as-is |
+| `Recommendation Mode: llm-repaired` | LLM output had structural issues; repaired automatically |
+| `Recommendation Mode: deterministic-fallback` | LLM failed completely; deterministic report used |
+
+All three paths exit 0 — the report is always structurally valid. Use this label to audit which path ran.
+
+### Exit codes in LLM mode
+
+| Exit Code | Meaning |
+|---|---|
+| 0 | Report generated (llm, llm-repaired, deterministic-fallback, or deterministic) |
+| 2 | Input error — bad config file, invalid flags, missing API key |
+
+All LLM paths — including provider exceptions (network error, authentication failure, timeout) — produce a valid report and exit 0 via the deterministic fallback. Exit 2 covers CLI-level input errors only.
+
+---
+
 ## CLI Reference
 
 ### `iro run`
@@ -303,6 +414,14 @@ Supply `--area-map` with `--diff-file` or `--ref` to auto-derive `changed_areas`
 | Option | Description |
 |---|---|
 | `--output, -o <path>` | Write report to file instead of stdout |
+| `--mode deterministic\|llm\|compare` | Recommendation mode (default: `deterministic`) |
+| `--provider openai\|ollama\|gemini` | LLM provider (required when `--mode llm` or `compare`) |
+| `--model <name>` | LLM model identifier (e.g. `llama3`, `gpt-4o`, `gemini-1.5-pro`) |
+| `--base-url <url>` | LLM provider base URL override (useful for local/proxy deployments) |
+| `--temperature <float>` | LLM sampling temperature (default: 0.3) |
+| `--max-tokens <int>` | LLM max response tokens (default: 4096) |
+| `--config <path>` | Path to LLM config YAML (provider settings; must not contain `api_key`) |
+| `--summary-only` | Output only the `## Optimisation Summary` section |
 | `--history-dir <path>` | Directory of JUnit XML files (one file per CI run); derives flakiness metrics automatically |
 | `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) with flakiness metrics |
 | `--area-map <path>` | area-map.yaml config; requires `--diff-file` or `--ref` |
@@ -316,6 +435,14 @@ Supply `--area-map` with `--diff-file` or `--ref` to auto-derive `changed_areas`
 | `--tests <path>` | Path to YAML file containing the `test_suite` block |
 | `--sprint <path>` | Path to YAML file containing `sprint_context` and `constraints` |
 | `--output, -o <path>` | Write report to file instead of stdout |
+| `--mode deterministic\|llm\|compare` | Recommendation mode (default: `deterministic`) |
+| `--provider openai\|ollama\|gemini` | LLM provider |
+| `--model <name>` | LLM model identifier |
+| `--base-url <url>` | LLM provider base URL override |
+| `--temperature <float>` | LLM sampling temperature |
+| `--max-tokens <int>` | LLM max response tokens |
+| `--config <path>` | Path to LLM config YAML |
+| `--summary-only` | Output only the `## Optimisation Summary` section |
 | `--history-dir <path>` | Directory of JUnit XML files |
 | `--history-file <path>` | Pre-computed history file (`.csv` or `.json`) |
 | `--area-map <path>` | area-map.yaml config; requires `--diff-file` or `--ref` |
@@ -332,6 +459,14 @@ Supply `--area-map` with `--diff-file` or `--ref` to auto-derive `changed_areas`
 - `--area-map` requires exactly one of `--diff-file` or `--ref`.
 - `--diff-file` and `--ref` are mutually exclusive.
 - If `--ref` is given, `git diff --name-only <ref>` is run from the current working directory.
+
+**LLM mode flag rules:**
+- `--mode llm` and `--mode compare` require `--provider` or a config file that specifies a provider.
+- `--provider openai` and `--provider gemini` require the `IRO_LLM_API_KEY` environment variable.
+- `--provider ollama` does not require an API key.
+- `--config` must not contain an `api_key` field — use `IRO_LLM_API_KEY` for all providers.
+- Config resolution order: defaults → config file → env vars → CLI flags (last wins).
+- Structural repair and deterministic fallback both exit 0; they are transparent recovery paths.
 
 | Exit Code | Meaning |
 |---|---|
