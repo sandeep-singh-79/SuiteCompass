@@ -259,6 +259,89 @@ Note: this worked example does not have a corresponding file in `benchmarks/` �
 
 ---
 
+## History-Backed Benchmarks
+
+A history-backed benchmark proves that `--history-dir` changes recommendations relative to the YAML-only baseline. Use one when you want to lock in a regression test for the history overlay path.
+
+### Directory structure
+
+History benchmarks live in a subdirectory because they require XML fixtures alongside the input and assertions files:
+
+```
+benchmarks/with-history/
+    input.yaml                  # standard SuiteCompass input
+    assertions.yaml             # standard assertions file
+    junit-history/              # JUnit XML run files (one per CI run)
+        run-00.xml
+        run-01.xml
+        ...
+```
+
+### Writing the input file
+
+Design the scenario to show a visible recommendation shift:
+- One test with **low YAML flakiness** whose XML history shows high flakiness → should land in Retire Candidates with history applied
+- One test with **high YAML flakiness** whose XML history shows low flakiness → should NOT be retired with history applied
+
+Both tests must share the same `coverage_areas` so neither has unique coverage (unique-coverage tests can never be retired).
+
+```yaml
+# input.yaml excerpt
+test_suite:
+  - id: SprintSuite::flaky_history
+    flakiness_rate: 0.05   # YAML says safe; history will say 0.50
+    coverage_areas: [SharedArea]
+    ...
+  - id: SprintSuite::stable_history
+    flakiness_rate: 0.50   # YAML says risky; history will say 0.00
+    coverage_areas: [SharedArea]
+    ...
+```
+
+### Writing JUnit XML run files
+
+Use alternating pass/fail runs to produce meaningful flakiness (consistent failures score 0.0):
+- Even-numbered runs: both tests pass
+- Odd-numbered runs: the target flaky test fails, stable test passes
+
+This gives the flaky test `flakiness_rate = 0.5` (every failure is adjacent to a pass).
+
+### Assertions for history-backed benchmarks
+
+```yaml
+must_include_substrings:
+  # History-driven retire: exact retire-format string proves the test landed in Retire Candidates
+  - "SprintSuite::flaky_history Flaky test name (flakiness: 0.50, no unique coverage)"
+  # History-saved test still appears in an active tier
+  - "SprintSuite::stable_history Stable test name"
+
+must_not_include_substrings:
+  # Stable test must NOT be a retire candidate (history removed it from retire risk)
+  - "SprintSuite::stable_history Stable test name (flakiness:"
+```
+
+### Running a history-backed benchmark in tests
+
+History-backed benchmarks require the JUnit XML parser — they cannot be run via `iro benchmark` (which does not accept `--history-dir`). Use the pytest harness instead:
+
+```python
+from intelligent_regression_optimizer.junit_xml_parser import parse_junit_directory
+from intelligent_regression_optimizer.end_to_end_flow import run_pipeline
+from intelligent_regression_optimizer.benchmark_runner import run_assertions
+
+def test_history_benchmark():
+    xml_dir = BENCHMARKS / "with-history" / "junit-history"
+    history = parse_junit_directory(str(xml_dir))
+    result = run_pipeline(str(BENCHMARKS / "with-history" / "input.yaml"), history=history)
+    assert result.exit_code == 0
+    ar = run_assertions(result.message, str(BENCHMARKS / "with-history" / "assertions.yaml"))
+    assert ar.is_valid, ar.errors
+```
+
+See `tests/test_end_to_end_flow.py::TestHistoryBenchmark` for the reference implementation.
+
+---
+
 ## Checklist Before Committing
 
 - [ ] Input passes `iro run` without validation errors

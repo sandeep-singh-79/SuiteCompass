@@ -1,0 +1,39 @@
+# area-map.yaml — maps file-path globs to coverage area names
+#
+# Use with:  iro diff-areas --area-map area-map.yaml --ref HEAD~1
+#            iro run input.yaml --area-map area-map.yaml --ref HEAD~1
+#
+# Each entry has:
+#   pattern   - glob matched against every changed file path (fnmatch; ** crosses directories)
+#   areas     - list of coverage area names to emit when the pattern matches
+#
+# A file may match multiple patterns — all matching areas are unioned.
+# Area names must match the strings used in sprint_context.stories[].changed_areas.
+
+mappings:
+  - pattern: "src/payments/**"
+    areas:
+      - Payments
+
+  - pattern: "src/checkout/**"
+    areas:
+      - Checkout
+      - Payments
+
+  - pattern: "src/auth/**"
+    areas:
+      - Authentication
+
+  - pattern: "src/api/**"
+    areas:
+      - API
+
+  - pattern: "src/notifications/**"
+    areas:
+      - Notifications
+
+  - pattern: "tests/**"
+    areas: []        # test-only changes add no coverage areas
+
+  - pattern: "**/*.md"
+    areas: []        # documentation changes add no coverage areas

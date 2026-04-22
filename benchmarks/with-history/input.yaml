@@ -1,0 +1,48 @@
+# Benchmark: with-history
+# Scenario: History-backed recommendation shift
+#
+# T-HIST-FLAKY: YAML says flakiness_rate=0.05 (below retire threshold).
+#   JUnit history (10 runs, alternating pass/fail) shows flakiness=0.50.
+#   Expected: history overrides YAML → flakiness=0.50 > threshold → retire candidate.
+#
+# T-HIST-STABLE: YAML says flakiness_rate=0.50 (above retire threshold).
+#   JUnit history (10 runs, all pass) shows flakiness=0.00.
+#   Expected: history overrides YAML → flakiness=0.00 ≤ threshold → NOT retire candidate.
+#
+# Both tests cover the same area (PaymentService) so neither has unique coverage.
+# This guarantees retirement eligibility is determined purely by flakiness.
+
+sprint_context:
+  sprint_id: BENCH-HIST-01
+  stories:
+    - id: STORY-001
+      title: Payment retry refactor
+      risk: medium
+      type: feature
+      changed_areas:
+        - PaymentService
+      dependency_stories: []
+  exploratory_sessions: []
+
+test_suite:
+  - id: SprintSuite::flaky_history
+    name: Flaky history test
+    layer: unit
+    coverage_areas:
+      - PaymentService
+    execution_time_secs: 10
+    flakiness_rate: 0.05
+    automated: true
+
+  - id: SprintSuite::stable_history
+    name: Stable history test
+    layer: integration
+    coverage_areas:
+      - PaymentService
+    execution_time_secs: 20
+    flakiness_rate: 0.50
+    automated: true
+
+constraints:
+  flakiness_retire_threshold: 0.30
+  time_budget_mins: 60

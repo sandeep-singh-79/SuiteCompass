@@ -62,4 +62,22 @@ def run_assertions(markdown: str, assertions_path: str) -> ValidationResult:
         if substring in markdown:
             errors.append(f"Forbidden substring found: {substring!r}")
 
+    # --- min_section_word_count ---------------------------------------------
+    # Extract per-section text (up to the next ## heading or end of document)
+    import re
+    section_map: dict[str, str] = {}
+    for m in re.finditer(r"(## [^\n]+)\n(.*?)(?=\n## |\Z)", markdown, re.DOTALL):
+        section_map[m.group(1).rstrip()] = m.group(2)
+
+    for heading, min_words in assertions.get("min_section_word_count", {}).items():
+        total += 1
+        if heading not in section_map:
+            errors.append(f"Section not found for word-count check: {heading!r}")
+            continue
+        word_count = len(section_map[heading].split())
+        if word_count < min_words:
+            errors.append(
+                f"Section {heading!r} has {word_count} words, need >= {min_words}"
+            )
+
     return ValidationResult(errors=errors, total_checks=total)

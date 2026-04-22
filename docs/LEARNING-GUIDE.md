@@ -125,6 +125,62 @@ A test has **unique coverage** if at least one of its coverage areas is not cove
 - **Unique coverage present:** never retire, even if flaky — fix the flakiness instead
 - **No unique coverage:** safe to retire if flakiness is above threshold
 
+### How Flakiness is Computed from CI History (V1-A)
+
+In earlier input formats, `flakiness_rate` and `failure_count_last_30d` were entered manually in the YAML. With `--history-dir`, SuiteCompass can derive these values automatically from a directory of JUnit XML files (one file per CI run).
+
+**The heuristic:**
+
+```
+flakiness_rate         = flaky_failures / total_runs
+
+A failure is "flaky" when at least one adjacent run (by filename order,
+treated as chronological order) was a pass.  Consistent failures have no
+adjacent pass and contribute 0 to the numerator, giving flakiness_rate = 0.0.
+
+failure_count_last_30d = failures in runs with timestamp ≤ 30 days old
+                         (runs without a timestamp are included conservatively)
+```
+
+**Examples:**
+
+| Run sequence        | flakiness_rate | Interpretation            |
+|---------------------|----------------|---------------------------|
+| fail, fail, fail    | 0.0            | Consistently broken       |
+| fail, pass          | 0.5            | First run flaky (adj pass)|
+| fail, pass, fail    | 0.667          | Both failures are flaky   |
+| pass, fail, pass    | 0.333          | Isolated mid-run failure  |
+
+**File-order assumption:** XML files in the directory are sorted lexicographically
+(`sorted()`).  Because CI systems typically name artefacts with date- or
+sequence-prefixed filenames (e.g. `run-01.xml`, `2026-04-15.xml`),
+lexicographic order is treated as chronological.  If your files are not named
+this way, the heuristic may be unreliable.
+
+**Supported formats:**
+- pytest-junit: `<testsuite>` at the XML root (standard `pytest --junit-xml` output)
+- Maven Surefire: `<testsuites>` wrapping `<testsuite>` children
+
+**Limitations to be aware of:**
+- Each XML file is treated as exactly one test run — filename order does not affect the aggregate rate
+- A test absent from a file (not run, not skipped) does not contribute to `total_runs` for that file
+- `<skipped>` tests are excluded from all calculations
+- `<error>` elements are treated identically to `<failure>` elements
+- If no timestamp is present on a `<testsuite>`, that run's failures are included in `failure_count_last_30d` conservatively (we cannot confirm it was old)
+- History values take precedence over manually entered YAML values; a `[history-override]` warning is emitted for every test where the values differ
+
+**How history is merged into the pipeline (V1-A, `merge_history()`):**
+
+When history data is available it is merged into the normalized input *before* scoring runs:
+
+1. For each test in `test_suite`, look up its `id` in the history dict.
+2. If found: replace `flakiness_rate` with the history value; set `failure_count_last_30d` and `total_runs` from the history record.
+3. If a test's YAML `flakiness_rate` differs from the history value, a `[history-override]` warning is recorded.
+4. Tests not present in history are left unchanged.
+5. The scoring engine then receives the merged test_suite — history-derived flakiness values affect tier placement and retire decisions exactly as if they had been typed into the YAML.
+
+**Manual override remains available:** if CI history is unavailable or incomplete, you can still enter `flakiness_rate` directly in the YAML and omit `--history-dir`.
+
 ---
 
 ## 4. How to Interpret a SuiteCompass Report
@@ -204,7 +260,153 @@ A test has **unique coverage** if at least one of its coverage areas is not cove
 
 ---
 
-## 6. Hands-On Exercises
+## 6. How to Read an LLM-Enhanced Report
+
+SuiteCompass can run in `--mode llm` or `--mode compare` to add prose explanations to the deterministic output. This section explains what changes, what stays the same, and how to trust the result.
+
+### What the LLM Adds
+
+The LLM does not change scores, tiers, or tier assignments. The deterministic pipeline runs first — every test is scored, tiered, and checked against the budget exactly as in `--mode deterministic`. The LLM receives the full scoring context (sprint risks, changed areas, tier lists, health metrics) and explains the decisions in plain language.
+
+Think of it as an analyst who receives a spreadsheet of scores and writes a brief explaining why the numbers came out the way they did. The spreadsheet is authoritative; the analyst's brief summarises it for a wider audience.
+
+### Why Scores Are Still Authoritative
+
+The LLM operates after the scoring engine, not before. It cannot demote a must-run test, promote a deferred test, or remove a retire candidate. If the LLM output contradicts the deterministic scores it is because the LLM hallucinated content — and the structural repair or fallback mechanisms will correct or override that content.
+
+**The rule:** if you want to understand why a test is in must-run, check its score in the report. The prose narrative is a reading aid, not a decision record.
+
+### The Three Recommendation Modes
+
+Every LLM-mode report carries a `Recommendation Mode:` label that tells you which path was taken:
+
+| Label value | What happened |
+|---|---|
+| `Recommendation Mode: llm` | LLM output passed all structural checks; used as-is |
+| `Recommendation Mode: llm-repaired` | LLM output had missing headings or labels; repaired automatically before use |
+| `Recommendation Mode: deterministic-fallback` | LLM failed completely (exception, timeout, bad output that could not be repaired); deterministic report used |
+
+All three paths produce a structurally valid report and exit with code 0. You can run LLM mode in CI without worrying about a provider outage breaking your pipeline — the worst case is a clean deterministic fallback.
+
+### How Fallback Works
+
+The fallback chain runs automatically, with no intervention needed:
+
+```
+1. LLM generate()
+   │
+   ├─ Exception (network, auth, timeout)
+   │     → Recommendation Mode: deterministic-fallback (exit 0)
+   │
+   └─ Output received
+         │
+         ├─ Passes validation → Recommendation Mode: llm
+         │
+         └─ Fails validation
+               │
+               ├─ Repair succeeds → Recommendation Mode: llm-repaired
+               │
+               └─ Repair fails → Recommendation Mode: deterministic-fallback
+```
+
+Every path through the chain produces a valid report and exits 0. Provider exceptions are treated as recoverable: the engine falls back to deterministic output so CI never breaks due to an LLM outage.
+
+### Using Compare Mode
+
+`--mode compare` runs both pipelines in one command and delivers a side-by-side view. This is useful for:
+
+- Evaluating how well a new model or prompt explains a specific scenario
+- Auditing whether LLM narrative content is consistent with the deterministic scores
+- QA teams who want both the structured recommendation and the prose justification
+
+The comparison output includes a `## Comparison Summary` block showing the LLM mode and repair count, followed by both report bodies.
+
+### When to Use Each Mode
+
+| Situation | Recommended mode |
+|---|---|
+| CI pipeline, audit log, repeatable output | `deterministic` |
+| Stand-up or executive review with narrative context | `llm` |
+| Evaluating or testing a new LLM provider or model | `compare` |
+| Regulated environment where all inputs/outputs must be deterministic | `deterministic` |
+
+LLM mode adds value when the output goes to a human reader who benefits from explanation. In automated pipelines that parse the report or feed it to downstream tools, `deterministic` is the right default.
+
+---
+
+## 7. How CI History Improves Flakiness Accuracy
+
+### The Problem With YAML Flakiness
+
+When engineers declare `flakiness_rate: 0.05` in the input YAML, they are making an estimate. This estimate is typically stale (written at suite creation time), optimistic (nobody wants to admit their tests are flaky), or undiscovered (a test only started flaking after an infrastructure change last Tuesday). YAML-declared flakiness is a useful starting point, but it diverges from reality over time.
+
+### What the History Layer Adds
+
+SuiteCompass supports a second flakiness signal: actual CI execution history loaded from JUnit XML reports. When `--history-dir` or `--history-file` is supplied, the system overlays the observed failure rate onto each test's metadata before scoring begins.
+
+The merge rule is straightforward:
+- If a test has no CI history entry, the YAML flakiness is used unchanged.
+- If a test has a CI history entry, **the history-derived flakiness replaces the YAML flakiness** entirely. The YAML value is discarded.
+- If the history flakiness is materially different from the YAML flakiness, a `[history-override]` warning is emitted, naming the test and both values.
+
+This makes it possible to have a YAML that says `flakiness_rate: 0.02` (author was optimistic) but have the actual run use `0.76` derived from 200 CI builds.
+
+### When History Changes Tier Assignment
+
+Flakiness affects scoring via the retire threshold:
+
+- Tests at or above `flakiness_retire_threshold` (default `0.30`) are placed in the **Retire Candidates** tier regardless of coverage score.
+- Tests above `flakiness_high_tier_threshold` (default `0.20`) receive a score penalty that can push them down from must-run to should-run.
+
+If YAML says `flakiness_rate: 0.05` but history says `0.85`, the test will be moved to **Retire Candidates** by the history overlay — without any changes to the input YAML. The warning signals this invisible tier shift:
+
+```
+[history-override] TestName: yaml=0.05, history=0.85
+```
+
+Reading warnings is important. A high retire count combined with `[history-override]` warnings signals that your YAML is out of sync with reality.
+
+### When YAML and History Disagree: Trust the History, Flag the Drift
+
+History always wins. The `[history-override]` warning is not a conflict to resolve — it is a data quality signal. The right response is to:
+1. Confirm the history data covers enough runs to be reliable (aim for ≥30 recent builds).
+2. Update the YAML flakiness value to match history if you want the YAML to be authoritative again.
+3. If the discrepancy is intentional (e.g., a known transient flakiness spike), use `--history-file` with a pre-computed average over a longer window.
+
+### `--history-dir` vs `--history-file`
+
+| Flag | Use When |
+|---|---|
+| `--history-dir <path>` | You have raw JUnit XML files (e.g., from CI artifact storage). The system parses them and computes per-test stats. |
+| `--history-file <path>` | You have a pre-computed YAML mapping `test_id: {failure_count, run_count}`. Useful for sharing computed history across teams or time windows. |
+
+In CI pipelines, `--history-dir` is the natural choice: point it at the artifact folder for the last N builds. In cross-team or regulatory contexts, `--history-file` lets you commit a stable, reviewed history snapshot.
+
+### How Git Diff Area Mapping Works
+
+The `iro diff-areas` command reads a `--area-map` file that maps file glob patterns to area labels:
+
+```yaml
+# area-map.yaml
+areas:
+  - label: PaymentService
+    patterns: ["src/payments/**", "lib/card_processing/**"]
+  - label: NotificationService
+    patterns: ["src/notifications/**"]
+```
+
+When `iro diff-areas --area-map area-map.yaml --ref HEAD~1` is run, it:
+1. Lists all changed files in the diff.
+2. Matches each changed file against every area's glob patterns.
+3. Emits the set of area labels that had at least one matching file.
+
+You then pass this output to `iro run --area-map area-map.yaml`, which replaces the `changed_areas` in each sprint story with the areas derived from the diff. This removes the manual step of declaring which areas changed — the commit history drives it automatically.
+
+The conceptual benefit: test selection becomes a function of what actually changed in the codebase, not what an engineer remembered to declare in the sprint YAML. In a mature pipeline, `iro diff-areas` and `iro run --area-map` run back-to-back in CI, and the sprint YAML only needs stories, constraints, and dependency definitions.
+
+---
+
+## 8. Hands-On Exercises
 
 ### Exercise 1: Predict the Tier Change
 
@@ -365,6 +567,66 @@ raw_score = 1.5  → defer tier (<4)
 Score is 1.5 — above zero but in the defer tier. To push this to should-run, the dependency story would need `risk: high` (dep_risk_mult = 1.0 × 0.5 = 0.5 → dep contribution = 2.5) plus an exploratory match (+3 → total = 5.5, just above the should-run threshold of 4.0).
 
 Key insight: dependency traversal is a **signal amplifier**, not a tier guarantee. A test that only reaches a story via a low-risk dependency will correctly land in defer. High-risk dependencies give meaningful score contributions.
+
+</details>
+
+### Exercise 6: History Override and Tier Shift
+
+This exercise reinforces how CI history silently overrides YAML flakiness and moves a healthy-looking test to the Retire Candidates tier.
+
+1. Create an input YAML with one test: `id: T1`, `flakiness_rate: 0.02`, `coverage_areas: [AreaA]`, `execution_time_secs: 30`
+2. Add a story with `risk: high`, `changed_areas: [AreaA]`
+3. Run `iro run` — predict which tier T1 lands in (hint: flakiness is below the retire threshold).
+4. Create a history YAML file:
+   ```yaml
+   T1:
+     failure_count: 75
+     run_count: 100
+   ```
+5. Run `iro run --history-file <path>` — predict the tier change before running.
+6. Verify: T1 should appear in **Retire Candidates** and the output should contain a `[history-override]` warning.
+
+**Expected:** T1 scores well in step 3 (direct coverage with high-risk story, low flakiness → must-run or should-run). In step 6, history flakiness of 0.75 exceeds the retire threshold, so T1 is retired. Warning: `[history-override] T1: yaml=0.02, history=0.75`.
+
+<details>
+<summary><strong>Key Insight</strong></summary>
+
+The YAML `flakiness_rate: 0.02` is never consulted once a history entry exists. The history-derived rate (75/100 = 0.75) replaces it entirely. This is intentional — observed CI data is more reliable than declared estimates.
+
+The `[history-override]` warning exists precisely to surface this kind of YAML drift. A 0.02 → 0.75 discrepancy usually indicates the test started flaking after the YAML was written. Action: investigate the root cause, fix or retire the test, then update the YAML if you keep it.
+
+</details>
+
+### Exercise 7: Diff-Derived Area Mapping
+
+This exercise demonstrates how `iro diff-areas` removes the need to manually declare `changed_areas` in the sprint YAML.
+
+1. Create a sprint YAML with one story: `risk: high`, `changed_areas: [ServiceA]`
+2. Add two tests: one covering `ServiceA`, one covering `ServiceB`
+3. Run `iro run` normally — confirm the ServiceA test scores and the ServiceB test does not.
+4. Create an area map file:
+   ```yaml
+   areas:
+     - label: ServiceB
+       patterns: ["src/service_b/**"]
+     - label: ServiceA
+       patterns: ["src/service_a/**"]
+   ```
+5. Run `iro diff-areas --area-map area-map.yaml --ref HEAD~1` — inspect the output. It will list the areas that match changed files at HEAD~1.
+6. Run `iro run --area-map area-map.yaml` — this replaces the story's `changed_areas` with the diff-derived set.
+7. Predict: if the diff included files in `src/service_b/`, the ServiceB test should now appear in a higher tier.
+
+**Expected:** The area map drive the test selection automatically. Tests whose coverage areas match diff-touched areas are promoted. Tests whose areas were not changed are scored at zero unless they have a dependency path.
+
+<details>
+<summary><strong>When to Use This Pattern</strong></summary>
+
+The diff-area pattern is most valuable in two scenarios:
+
+1. **Large monorepos** where sprint stories accumulate stale `changed_areas` declarations. Developers forget to update them. The diff map makes declarations automatic.
+2. **CI regression gates** where you want test selection to be 100% reproducible from the commit graph, not from human memory.
+
+For small teams with disciplined YAML hygiene, the manual `changed_areas` approach is simpler and works fine. The diff map is the next evolution once maintaining declarations becomes a bottleneck.
 
 </details>
 

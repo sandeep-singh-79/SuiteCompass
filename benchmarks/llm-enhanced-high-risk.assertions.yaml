@@ -1,0 +1,45 @@
+# Assertions for: llm-enhanced-high-risk
+# Verifies that LLM-mode output produced against the high-risk-feature-sprint input
+# satisfies the output contract AND is identified as an LLM-mode report.
+#
+# These assertions are exercised by the TestLLMBenchmarkIntegration test class,
+# which runs run_llm_pipeline() with FakeLLMClient against the high-risk input
+# and then calls run_assertions() against this file.
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Flakiness Tier High:"
+
+must_include_substrings:
+  # LLM mode is declared in the Recommendation Mode label.
+  # Values "llm", "llm-repaired", and "deterministic-fallback" are all acceptable
+  # for a live provider, but FakeLLMClient always returns "llm".
+  - "Recommendation Mode: llm"
+
+must_not_include_substrings:
+  # A silent fallback to purely deterministic output would indicate the LLM
+  # layer was bypassed without a declared reason.
+  - "Recommendation Mode: deterministic"
+
+# ---------------------------------------------------------------------------
+# R4: Narrative quality — sections must contain substantive prose, not just labels
+# ---------------------------------------------------------------------------
+# FakeLLMClient returns a report with real narrative in these sections.
+# A structural-only report (labels + bullets only) would fail these checks.
+min_section_word_count:
+  "## Optimisation Summary": 25   # beyond the 6 required labels
+  "## Must-Run": 20               # must contain reasoning, not just a bullet list
+  "## Suite Health Summary": 20   # must include an assessment sentence

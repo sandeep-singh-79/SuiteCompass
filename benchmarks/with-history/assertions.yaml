@@ -1,0 +1,33 @@
+# Assertions for: with-history benchmark
+#
+# Proves that JUnit XML history changes recommendations in both directions:
+#   - SprintSuite::flaky_history: YAML flakiness=0.05, history=0.50 → retire
+#   - SprintSuite::stable_history: YAML flakiness=0.50, history=0.00 → should-run
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+
+must_include_substrings:
+  # Sprint risk correctly identified
+  - "Sprint Risk Level: medium"
+  # History-driven retire candidate appears in retire section
+  - "SprintSuite::flaky_history Flaky history test (flakiness: 0.50, no unique coverage)"
+  # History-saved stable test appears in an active tier (not retired)
+  - "SprintSuite::stable_history Stable history test"
+
+must_not_include_substrings:
+  # Stable test must NOT be in retire section (history removed it from retire risk)
+  - "SprintSuite::stable_history Stable history test (flakiness:"

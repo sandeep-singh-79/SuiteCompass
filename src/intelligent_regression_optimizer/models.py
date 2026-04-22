@@ -70,3 +70,56 @@ class FlowResult:
     exit_code: int
     message: str
     output_path: str | None
+    warnings: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# V1-A: Test history data structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class TestHistoryRecord:
+    """Per-test metrics derived from CI history or a pre-computed summary file."""
+
+    test_id: str
+    flakiness_rate: float
+    failure_count_last_30d: int
+    total_runs: int
+    last_run_date: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# V1-C: LLM integration data structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class ProviderConfig:
+    """Configuration for an LLM provider."""
+
+    provider: str
+    model: str
+    base_url: str | None
+    api_key: str | None
+    temperature: float
+    max_tokens: int
+
+
+@dataclass(slots=True)
+class GenerationRequest:
+    """Input to an LLM generate call."""
+
+    system_prompt: str
+    user_prompt: str
+
+
+@dataclass(slots=True)
+class GenerationResponse:
+    """Output from an LLM generate call."""
+
+    content: str
+    model: str
+    provider: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None

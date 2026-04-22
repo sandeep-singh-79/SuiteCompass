@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,9 +11,16 @@ import click
 import yaml
 
 from .benchmark_runner import run_assertions
+from .diff_mapper import apply_area_map, load_area_map, map_files_to_areas, parse_diff_output
 from .end_to_end_flow import run_pipeline, run_pipeline_from_merged
 from .excel_loader import ExcelLoaderError, load_excel
-from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR
+from .history_loader import load_history_csv, load_history_json
+from .junit_xml_parser import parse_junit_directory
+from .input_loader import InputValidationError
+from .models import EXIT_INPUT_ERROR, EXIT_OK, EXIT_VALIDATION_ERROR, TestHistoryRecord
+from .llm_flow import run_llm_pipeline
+from .config_loader import load_llm_config
+from .client_factory import create_llm_client
 
 
 @click.group()
@@ -23,15 +31,59 @@ def main() -> None:
 @main.command()
 @click.argument("input_file", type=click.Path(exists=False), required=False, default=None)
 @click.option("--output", "-o", type=click.Path(), default=None, help="Write report to file instead of stdout.")
+@click.option("--mode", type=click.Choice(["deterministic", "llm", "compare"]), default="deterministic",
+              help="Recommendation mode: deterministic (default), llm, or compare.")
+@click.option("--provider", type=str, default=None, help="LLM provider (openai, ollama, gemini).")
+@click.option("--model", type=str, default=None, help="LLM model identifier.")
+@click.option("--base-url", type=str, default=None, help="LLM provider base URL override.")
+@click.option("--temperature", type=float, default=None, help="LLM sampling temperature.")
+@click.option("--max-tokens", type=int, default=None, help="LLM max response tokens.")
+@click.option("--config", "llm_config", type=click.Path(), default=None, help="Path to LLM config YAML.")
 @click.option("--tests", type=click.Path(), default=None,
               help="Path to test_suite YAML file (use with --sprint).")
 @click.option("--sprint", type=click.Path(), default=None,
               help="Path to sprint context YAML file (use with --tests).")
-def run(input_file: str | None, output: str | None, tests: str | None, sprint: str | None) -> None:
+@click.option("--history-dir", type=click.Path(), default=None,
+              help="Directory of JUnit XML files (one per CI run) to derive flakiness history.")
+@click.option("--history-file", type=click.Path(), default=None,
+              help="Pre-computed history file (.csv or .json) with flakiness metrics.")
+@click.option("--area-map", type=click.Path(), default=None,
+              help="area-map.yaml config for deriving changed_areas from git diff.")
+@click.option("--diff-file", type=click.Path(), default=None,
+              help="File containing 'git diff --name-only' output (use with --area-map).")
+@click.option("--ref", type=str, default=None,
+              help="Git ref to diff against (default HEAD~1, use with --area-map).")
+@click.option("--summary-only", is_flag=True, default=False,
+              help="Output only the Optimisation Summary section of the report.")
+def run(
+    input_file: str | None,
+    output: str | None,
+    mode: str,
+    provider: str | None,
+    model: str | None,
+    base_url: str | None,
+    temperature: float | None,
+    max_tokens: int | None,
+    llm_config: str | None,
+    tests: str | None,
+    sprint: str | None,
+    history_dir: str | None,
+    history_file: str | None,
+    area_map: str | None,
+    diff_file: str | None,
+    ref: str | None,
+    summary_only: bool,
+) -> None:
     """Run the optimisation pipeline on INPUT_FILE and print the report.
 
     Alternatively, use --tests and --sprint to supply the test suite and
     sprint context as separate files. The tool merges them before running.
+
+    Supply --history-dir or --history-file to overlay CI-derived flakiness
+    metrics onto the test_suite before scoring.
+
+    Supply --area-map with --diff-file or --ref to auto-derive changed_areas
+    for all stories from git diff output.
     """
     # Validate argument combinations
     if input_file and (tests or sprint):
@@ -42,15 +94,88 @@ def run(input_file: str | None, output: str | None, tests: str | None, sprint: s
         click.echo("Error: provide either INPUT_FILE or both --tests and --sprint.", err=True)
         sys.exit(EXIT_INPUT_ERROR)
 
-    if bool(tests) != bool(sprint):
-        click.echo("Error: --tests and --sprint must be used together.", err=True)
+    if history_dir and history_file:
+        click.echo("Error: --history-dir and --history-file are mutually exclusive.", err=True)
         sys.exit(EXIT_INPUT_ERROR)
 
+    if area_map and not (diff_file or ref):
+        click.echo("Error: --area-map requires --diff-file or --ref.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if diff_file and ref:
+        click.echo("Error: --diff-file and --ref are mutually exclusive.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    # Load history when requested
+    history: dict[str, TestHistoryRecord] | None = None
+    if history_dir is not None:
+        if not Path(history_dir).is_dir():
+            click.echo(f"Error: history directory not found: {history_dir!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        try:
+            history = parse_junit_directory(history_dir)
+        except InputValidationError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+
+    if history_file is not None:
+        hist_p = Path(history_file)
+        if not hist_p.exists():
+            click.echo(f"Error: history file not found: {history_file!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        suffix = hist_p.suffix.lower()
+        if suffix == ".csv":
+            try:
+                history = load_history_csv(history_file)
+            except InputValidationError as exc:
+                click.echo(f"Error: {exc}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+        elif suffix == ".json":
+            try:
+                history = load_history_json(history_file)
+            except InputValidationError as exc:
+                click.echo(f"Error: {exc}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+        else:
+            click.echo(
+                f"Error: --history-file must be a .csv or .json file, got {hist_p.name!r}",
+                err=True,
+            )
+            sys.exit(EXIT_INPUT_ERROR)
+
+    # Resolve area map → changed_areas set (CLI layer owns git/file I/O)
+    changed_areas: set[str] | None = None
+    if area_map is not None:
+        try:
+            mappings = load_area_map(area_map)
+        except InputValidationError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        if diff_file:
+            diff_p = Path(diff_file)
+            if not diff_p.exists():
+                click.echo(f"Error: diff file not found: {diff_file!r}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+            diff_text = diff_p.read_text(encoding="utf-8")
+        else:
+            git_ref = ref
+            proc = subprocess.run(
+                ["git", "diff", "--name-only", git_ref],
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode != 0:
+                click.echo(f"Error: git diff failed (exit {proc.returncode})", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+            diff_text = proc.stdout
+        files = parse_diff_output(diff_text)
+        changed_areas = map_files_to_areas(files, mappings)
+
     if input_file:
-        result = run_pipeline(input_file)
+        result = run_pipeline(input_file, history=history, changed_areas=changed_areas)
     else:
-        # Merge mode
-        result = _run_merged(tests, sprint)  # type: ignore[arg-type]
+        # Merge mode — history applied inside run_pipeline_from_merged via separate helper
+        result = _run_merged(tests, sprint, history=history, changed_areas=changed_areas)  # type: ignore[arg-type]
 
     if result.exit_code == EXIT_INPUT_ERROR:
         click.echo(f"Error: {result.message}", err=True)
@@ -60,16 +185,107 @@ def run(input_file: str | None, output: str | None, tests: str | None, sprint: s
         click.echo(f"Validation error: {result.message}", err=True)
         sys.exit(EXIT_VALIDATION_ERROR)
 
-    if output:
-        Path(output).write_text(result.message, encoding="utf-8")
-    else:
-        click.echo(result.message)
+    for warning in result.warnings:
+        click.echo(f"Warning: {warning}", err=True)
 
+    # LLM mode routing — deterministic result is used for comparison and as fallback context
+    if mode in ("llm", "compare"):
+        cli_overrides: dict[str, Any] = {}
+        if provider:
+            cli_overrides["provider"] = provider
+        if model:
+            cli_overrides["model"] = model
+        if base_url:
+            cli_overrides["base_url"] = base_url
+        if temperature is not None:
+            cli_overrides["temperature"] = temperature
+        if max_tokens is not None:
+            cli_overrides["max_tokens"] = max_tokens
+
+        try:
+            llm_cfg = load_llm_config(config_path=llm_config, cli_overrides=cli_overrides)
+        except (FileNotFoundError, ValueError) as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+
+        if llm_cfg.provider in ("openai", "gemini") and not llm_cfg.api_key:
+            click.echo(
+                f"Error: --mode {mode} with provider {llm_cfg.provider!r} requires IRO_LLM_API_KEY.",
+                err=True,
+            )
+            sys.exit(EXIT_INPUT_ERROR)
+
+        llm_client = create_llm_client(llm_cfg)
+
+        # Re-derive normalized/classifications/tier_result for the LLM layer
+        from .context_classifier import classify_context
+        from .scoring_engine import score_tests
+        from .input_loader import load_input
+
+        if input_file:
+            pkg = load_input(input_file)
+            normalized = pkg.normalized
+        else:
+            # Merge mode: reconstruct from the two YAML files already validated above
+            from .end_to_end_flow import merge_history
+            from .input_loader import validate_raw
+            merged_data = _read_and_merge_yaml(tests, sprint)  # type: ignore[arg-type]
+            normalized = validate_raw(merged_data)
+            if history:
+                normalized, _ = merge_history(normalized, history)
+            if changed_areas is not None:
+                from .diff_mapper import apply_area_map
+                normalized = apply_area_map(normalized, changed_areas)
+
+        # Propagate history provenance so the LLM prompt can cite its data source
+        if history is not None:
+            normalized.setdefault("_meta", {})["history_source"] = "ci-history"
+
+        classifications = classify_context(normalized)
+        tier_result = score_tests(normalized, classifications)
+
+        llm_result = run_llm_pipeline(normalized, classifications, tier_result, llm_client)
+
+        if mode == "compare":
+            from .comparison import build_comparison_report
+            report = build_comparison_report(result.message, llm_result)
+        else:
+            report = llm_result.flow_result.message
+
+        _emit(output, _maybe_summarise(report, summary_only))
+        sys.exit(EXIT_OK)
+
+    _emit(output, _maybe_summarise(result.message, summary_only))
     sys.exit(EXIT_OK)
 
 
-def _run_merged(tests_path: str, sprint_path: str) -> Any:
+def _maybe_summarise(content: str, summary_only: bool) -> str:
+    """Return only the Optimisation Summary section when summary_only is set."""
+    if not summary_only:
+        return content
+    import re
+    match = re.search(
+        r"(## Optimisation Summary.*?)(?=\n## |\Z)", content, re.DOTALL
+    )
+    return match.group(1).rstrip() + "\n" if match else content
+
+
+def _emit(output: str | None, content: str) -> None:
+    """Write content to file or stdout."""
+    if output:
+        Path(output).write_text(content, encoding="utf-8")
+    else:
+        click.echo(content)
+
+
+def _run_merged(
+    tests_path: str,
+    sprint_path: str,
+    history: dict | None = None,
+    changed_areas: set | None = None,
+) -> Any:
     """Load two YAML files, merge them, and run the pipeline."""
+    from .end_to_end_flow import merge_history
     from .models import FlowResult
 
     tests_p = Path(tests_path)
@@ -134,7 +350,23 @@ def _run_merged(tests_path: str, sprint_path: str) -> Any:
         "constraints": sprint_data["constraints"],
     }
 
-    return run_pipeline_from_merged(merged)
+    return run_pipeline_from_merged(merged, history=history, changed_areas=changed_areas)
+
+
+def _read_and_merge_yaml(tests_path: str, sprint_path: str) -> dict[str, Any]:
+    """Read test_suite YAML and sprint YAML, merge into a combined input dict.
+
+    Assumes both files exist and contain the expected keys.
+    """
+    with Path(tests_path).open(encoding="utf-8") as fh:
+        tests_data = yaml.safe_load(fh)
+    with Path(sprint_path).open(encoding="utf-8") as fh:
+        sprint_data = yaml.safe_load(fh)
+    return {
+        "sprint_context": sprint_data["sprint_context"],
+        "test_suite": tests_data["test_suite"],
+        "constraints": sprint_data["constraints"],
+    }
 
 
 @main.command()
@@ -204,3 +436,58 @@ def import_tests(xlsx_file: str, output: str | None, sheet: str | None) -> None:
 
     sys.exit(EXIT_OK)
 
+
+@main.command("diff-areas")
+@click.option("--area-map", required=True, type=click.Path(),
+              help="area-map.yaml config mapping glob patterns to coverage areas.")
+@click.option("--diff-file", type=click.Path(), default=None,
+              help="File containing 'git diff --name-only' output.")
+@click.option("--ref", type=str, default=None,
+              help="Git ref to diff against, e.g. HEAD~1. Runs 'git diff --name-only <ref>'. Required unless --diff-file is given.")
+def diff_areas(area_map: str, diff_file: str | None, ref: str | None) -> None:
+    """Derive changed_areas from git diff and print a YAML fragment.
+
+    Output: 'changed_areas: [Area1, Area2]' — paste into sprint_context.stories.
+    """
+    if diff_file and ref:
+        click.echo("Error: --diff-file and --ref are mutually exclusive.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if not diff_file and not ref:
+        click.echo("Error: provide --diff-file or --ref.", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    try:
+        mappings = load_area_map(area_map)
+    except InputValidationError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(EXIT_INPUT_ERROR)
+
+    if diff_file:
+        diff_p = Path(diff_file)
+        if not diff_p.exists():
+            click.echo(f"Error: diff file not found: {diff_file!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        diff_text = diff_p.read_text(encoding="utf-8")
+    else:
+        git_ref = ref
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", git_ref],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            click.echo(f"Error: git diff failed (exit {proc.returncode})", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+        diff_text = proc.stdout
+
+    files = parse_diff_output(diff_text)
+    areas = map_files_to_areas(files, mappings)
+    fragment = yaml.dump(
+        {"changed_areas": sorted(areas)},
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
+    )
+    click.echo(fragment, nl=False)
+    sys.exit(EXIT_OK)

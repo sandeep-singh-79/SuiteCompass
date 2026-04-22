@@ -12,6 +12,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 - **Tiered recommendations** — must-run / should-run / defer / retire with override support
 - **NFR elevation** — automatic promotion of performance and security tests in high-risk sprints
 - **Budget-aware** — respects time budgets with overflow demotion logic
+- **LLM narrative** — optional prose explanations via Ollama, OpenAI, or Gemini; deterministic fallback guaranteed
 - **Excel import** — teams can feed existing spreadsheets instead of hand-writing YAML
 - **Binary validation** — machine-checkable output contract with section-aware assertions
 
@@ -20,7 +21,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 | Path | Purpose |
 |---|---|
 | `src/intelligent_regression_optimizer/` | Core package — loader, classifier, scorer, renderer, validator, CLI |
-| `tests/` | 228+ pytest tests (98%+ coverage) |
+| `tests/` | 562 pytest tests (96.47% coverage) |
 | `benchmarks/` | Benchmark input YAMLs + assertion files + sample Excel |
 | `templates/` | Excel import template (13 columns) |
 | `docs/` | Full documentation (see index below) |
@@ -48,8 +49,15 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 
 | Command | Purpose | Key Flags | Exit Codes |
 |---|---|---|---|
-| `iro run <input.yaml>` | Run optimisation pipeline, print report | `--output, -o <path>` | 0 = success, 1 = validation error, 2 = input error |
+| `iro run <input.yaml>` | Run optimisation pipeline (deterministic), print report | `--output, -o <path>` | 0 = success, 1 = validation error, 2 = input error |
 | `iro run --tests <t.yaml> --sprint <s.yaml>` | Merge separate test suite + sprint context files and run | `--output, -o <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --mode llm --provider ollama --model llama3` | Run LLM-enhanced report (local Ollama) | `--mode`, `--provider`, `--model`, `--base-url`, `--temperature`, `--max-tokens`, `--config`, `--summary-only` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --mode llm --provider openai --model gpt-4o` | Run LLM-enhanced report (OpenAI); requires `IRO_LLM_API_KEY` | same as above | 0 = success, 2 = input error |
+| `iro run <input.yaml> --mode compare --provider ollama` | Side-by-side deterministic vs LLM comparison | same as above | 0 = success, 2 = input error |
+| `iro run <input.yaml> --history-dir <dir>` | Run with JUnit XML CI history overlay | `--history-dir <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --history-file <file>` | Run with pre-computed CSV/JSON history overlay | `--history-file <path>` | 0 = success, 2 = input error |
+| `iro run <input.yaml> --area-map <map> --ref <ref>` | Run with git-diff-derived `changed_areas` override | `--area-map <path>`, `--diff-file <path>`, `--ref <git-ref>` | 0 = success, 2 = input error |
+| `iro diff-areas --area-map <map> --ref <ref>` | Print YAML fragment of changed areas from git diff | `--area-map <path>`, `--diff-file <path>`, `--ref <git-ref>` | 0 = success, 2 = input error |
 | `iro benchmark <input.yaml> <assertions.yaml>` | Run pipeline + validate against assertions | — | 0 = pass, 1 = fail, 2 = input error |
 | `iro import-tests <file.xlsx>` | Import Excel test inventory as test_suite YAML | `--output, -o <path>`, `--sheet, -s <name>` | 0 = success, 2 = input error |
 
@@ -75,8 +83,11 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | Phase 1 (Deterministic Core) | Complete |
 | Phase 3 (Excel Adapter — all tracks A1–A6) | Complete |
 | Phase 2 (Documentation) | Complete |
-| Tests | 248 |
-| Coverage | 97.7% |
+| V1-A (CI history overlay) | Complete |
+| V1-B (git diff area mapper) | Complete |
+| V1-C (LLM narrative layer) | Complete |
+| Tests | 562 |
+| Coverage | 96.47% |
 | Python | ≥ 3.13 |
 
 ## License

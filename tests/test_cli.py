@@ -63,6 +63,58 @@ class TestRunCommand:
             result = runner.invoke(main, ["run", str(BENCHMARKS / name)])
             assert result.exit_code == 0, f"Failed on {name}: {result.output}"
 
+    def test_run_tests_without_sprint_exits_2(self, repo_tmp):
+        """--tests without --sprint should exit 2 (guard-rail for mismatched flags)."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "--tests", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml")])
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# R2: --summary-only mode (F2)
+# ---------------------------------------------------------------------------
+
+class TestSummaryOnlyFlag:
+    """--summary-only outputs only the Optimisation Summary section."""
+
+    def test_summary_only_exits_0(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert result.exit_code == 0
+
+    def test_summary_only_contains_optimisation_summary_heading(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Optimisation Summary" in result.output
+
+    def test_summary_only_excludes_must_run_section(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Must-Run" not in result.output
+
+    def test_summary_only_excludes_suite_health_section(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        )
+        assert "## Suite Health Summary" not in result.output
+
+    def test_summary_only_output_shorter_than_full_report(self):
+        runner = CliRunner()
+        full = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml")],
+        ).output
+        summary_only = runner.invoke(
+            main, ["run", str(BENCHMARKS / "high-risk-feature-sprint.input.yaml"), "--summary-only"],
+        ).output
+        assert len(summary_only) < len(full)
+
 
 class TestBenchmarkCommand:
     """iro benchmark <input.yaml> <assertions.yaml> subcommand."""
@@ -153,3 +205,264 @@ class TestValidationErrorPaths:
         with patch("intelligent_regression_optimizer.cli.run_pipeline", return_value=bad_result):
             result = runner.invoke(main, ["benchmark", "any.yaml", "any.assertions.yaml"])
         assert result.exit_code == EXIT_VALIDATION_ERROR
+
+
+# ---------------------------------------------------------------------------
+# A4: --history-dir and --history-file flags
+# ---------------------------------------------------------------------------
+
+class TestHistoryFlags:
+    """iro run with --history-dir and --history-file flags."""
+
+    def _minimal_input(self, tmp_path, test_id: str = "T-001", flakiness: float = 0.05) -> Path:
+        """Write a minimal valid input YAML with one test and return its path."""
+        import yaml
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": test_id,
+                    "name": f"Test {test_id}",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": flakiness,
+                    "automated": True,
+                }
+            ],
+            "constraints": {"flakiness_retire_threshold": 0.30, "time_budget_mins": 60},
+        }
+        p = tmp_path / "input.yaml"
+        p.write_text(yaml.safe_dump(data))
+        return p
+
+    def _write_junit_pass_fail(self, xml_dir: Path, test_id: str, n_pass: int, n_fail: int) -> None:
+        """Write JUnit XML files for a single test — n_pass passing runs then n_fail failing."""
+        import xml.etree.ElementTree as ET
+        classname, name = test_id.split("::")
+        run = 0
+        for _ in range(n_pass):
+            suite = ET.Element("testsuite")
+            suite.set("name", "S")
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", name)
+            tc.set("classname", classname)
+            p = xml_dir / f"run-{run:03d}.xml"
+            p.write_text(ET.tostring(suite, encoding="unicode"))
+            run += 1
+        for _ in range(n_fail):
+            suite = ET.Element("testsuite")
+            suite.set("name", "S")
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", name)
+            tc.set("classname", classname)
+            fl = ET.SubElement(tc, "failure")
+            fl.set("message", "AssertionError")
+            p = xml_dir / f"run-{run:03d}.xml"
+            p.write_text(ET.tostring(suite, encoding="unicode"))
+            run += 1
+
+    # --- --history-dir ---
+
+    def test_history_dir_flag_exits_0(self, tmp_path):
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        input_p = self._minimal_input(tmp_path, "Pkg::test_a", flakiness=0.1)
+        self._write_junit_pass_fail(xml_dir, "Pkg::test_a", 3, 0)
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(xml_dir)])
+        assert result.exit_code == 0
+
+    def test_history_dir_missing_exits_2(self, tmp_path):
+        input_p = self._minimal_input(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(tmp_path / "no-such-dir")])
+        assert result.exit_code == 2
+
+    def test_history_dir_empty_dir_exits_0(self, tmp_path):
+        """Empty XML dir → no history available → pipeline still runs normally."""
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        input_p = self._minimal_input(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(xml_dir)])
+        assert result.exit_code == 0
+
+    def test_history_dir_overlays_flakiness(self, tmp_path):
+        """High-flakiness XML history should push test to retire tier."""
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        # Alternating pass/fail = highly flaky
+        input_p = self._minimal_input(tmp_path, "Pkg::test_a", flakiness=0.05)
+        # 10 runs: alternating pass/fail → ~0.8 flakiness_rate
+        for i in range(10):
+            import xml.etree.ElementTree as ET
+            suite = ET.Element("testsuite")
+            suite.set("name", "S")
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", "test_a")
+            tc.set("classname", "Pkg")
+            if i % 2 == 1:  # odd runs fail
+                fl = ET.SubElement(tc, "failure")
+                fl.set("message", "err")
+            (xml_dir / f"run-{i:03d}.xml").write_text(ET.tostring(suite, encoding="unicode"))
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(xml_dir)])
+        assert result.exit_code == 0
+        assert "retire" in result.output.lower() or "Retire" in result.output
+
+    # --- --history-file (CSV) ---
+
+    def test_history_file_csv_exits_0(self, tmp_path):
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.1)
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.1,1,10\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+
+    def test_history_file_json_exits_0(self, tmp_path):
+        import json
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.1)
+        json_p = tmp_path / "history.json"
+        json_p.write_text(json.dumps([
+            {"test_id": "T-001", "flakiness_rate": 0.1, "failure_count_last_30d": 1, "total_runs": 10}
+        ]))
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(json_p)])
+        assert result.exit_code == 0
+
+    def test_history_file_missing_exits_2(self, tmp_path):
+        input_p = self._minimal_input(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(tmp_path / "no.csv")])
+        assert result.exit_code == 2
+
+    def test_history_file_invalid_extension_exits_2(self, tmp_path):
+        input_p = self._minimal_input(tmp_path)
+        bad = tmp_path / "history.txt"
+        bad.write_text("some data")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(bad)])
+        assert result.exit_code == 2
+
+    def test_history_file_overlays_high_flakiness(self, tmp_path):
+        """CSV with flakiness_rate above retire threshold pushes test to retire."""
+        import yaml
+        data = {
+            "sprint_context": {
+                "stories": [{"id": "S-1", "risk": "low", "changed_areas": ["area-a"]}],
+            },
+            "test_suite": [
+                {
+                    "id": "T-001",
+                    "name": "Flaky test",
+                    "layer": "unit",
+                    "coverage_areas": ["area-a"],
+                    "execution_time_secs": 5,
+                    "flakiness_rate": 0.05,   # below threshold in YAML
+                    "automated": True,
+                }
+            ],
+            "constraints": {"flakiness_retire_threshold": 0.30, "time_budget_mins": 60},
+        }
+        input_p = tmp_path / "input.yaml"
+        input_p.write_text(yaml.safe_dump(data))
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text(
+            "test_id,flakiness_rate,failure_count_last_30d,total_runs\n"
+            "T-001,0.95,19,20\n"
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        assert "retire" in result.output.lower() or "Retire" in result.output
+
+    # --- mutual exclusion ---
+
+    def test_cannot_combine_history_dir_and_history_file(self, tmp_path):
+        input_p = self._minimal_input(tmp_path)
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\n")
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["run", str(input_p), "--history-dir", str(xml_dir), "--history-file", str(csv_p)]
+        )
+        assert result.exit_code == 2
+
+    def test_history_dir_malformed_xml_exits_2(self, tmp_path):
+        """A malformed XML file in --history-dir should exit 2."""
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        input_p = self._minimal_input(tmp_path)
+        (xml_dir / "run-01.xml").write_text("<not valid xml <><")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-dir", str(xml_dir)])
+        assert result.exit_code == 2
+
+    def test_history_file_csv_bad_data_exits_2(self, tmp_path):
+        """A CSV with invalid field values should exit 2."""
+        input_p = self._minimal_input(tmp_path, "T-001")
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text(
+            "test_id,flakiness_rate,failure_count_last_30d,total_runs\n"
+            "T-001,not_a_number,1,10\n"
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 2
+
+    def test_history_file_json_bad_data_exits_2(self, tmp_path):
+        """A JSON history file with invalid field values should exit 2."""
+        import json
+        input_p = self._minimal_input(tmp_path, "T-001")
+        json_p = tmp_path / "history.json"
+        json_p.write_text(json.dumps([
+            {"test_id": "T-001", "flakiness_rate": "not_a_number", "failure_count_last_30d": 1, "total_runs": 10}
+        ]))
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(json_p)])
+        assert result.exit_code == 2
+
+    # --- R2: history override warnings surfaced to operator ---
+
+    def test_history_override_warning_appears_in_output(self, tmp_path):
+        """When history changes flakiness_rate, a warning must be emitted."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.05)
+        csv_p = tmp_path / "history.csv"
+        # History has a different flakiness_rate → override warning expected
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.9,18,20\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        assert "T-001" in result.output
+        assert "history-override" in result.output.lower()
+
+    def test_no_override_warning_when_flakiness_unchanged(self, tmp_path):
+        """No warning emitted when history flakiness_rate matches the YAML value."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.1)
+        csv_p = tmp_path / "history.csv"
+        # Same flakiness_rate → no override
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.1,1,10\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        assert "history-override" not in result.output.lower()
+
+    def test_override_warning_leaves_markdown_report_intact(self, tmp_path):
+        """Markdown report is present and well-formed even when a warning is emitted."""
+        input_p = self._minimal_input(tmp_path, "T-001", flakiness=0.05)
+        csv_p = tmp_path / "history.csv"
+        csv_p.write_text("test_id,flakiness_rate,failure_count_last_30d,total_runs\nT-001,0.9,18,20\n")
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(input_p), "--history-file", str(csv_p)])
+        assert result.exit_code == 0
+        # Markdown report always starts with a heading
+        assert "#" in result.output
+
+

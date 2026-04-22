@@ -30,10 +30,12 @@ Read these files before proceeding.
 - Follow SOLID where it helps clarity, testability, and change safety; do not force abstraction for its own sake.
 - Prefer reuse and extension of existing code before introducing new modules or abstractions.
 - Write new code only when it is genuinely required by the current slice or validation need.
-- Refactor when complexity starts increasing or duplication becomes visible.
 - All code must be tested before it is marked complete.
 - Always report test pass/fail results and coverage details for code that was tested.
-- Follow TDD in the standard order: red, green, refactor.
+- Follow TDD in the standard order: red → green → refactor.
+  - Red: write the failing test first.
+  - Green: write the simplest code that passes. No premature abstraction.
+  - Refactor: remove duplication, improve clarity, introduce design patterns only when the existing code complexity warrants them. Patterns are a refactoring tool, not a starting point.
 
 ## Memory Update Discipline
 
