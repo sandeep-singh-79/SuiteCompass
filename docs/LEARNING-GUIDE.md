@@ -32,8 +32,16 @@ Input YAML
     │            4.0–7.9 → Should-Run
     │            < 4.0 → Defer
     │            retire conditions → Retire Candidates
+    │            flaky + unique coverage → Flaky-Critical
     ▼
-5. Rendering ── Markdown report with five sections + suite health summary
+5. Warnings ── inspect final tier state and emit advisory signals:
+    │           COVERAGE-GAP, NO-MUST-RUN-COVERAGE, FLAKINESS-REVERSED,
+    │           OVERRIDE-BUDGET, UNIQUE-DEMOTED, ZERO-BUDGET, NFR-NO-OVERLAP
+    ▼
+6. Rendering ── Markdown report with 8 sections:
+               Optimisation Summary, Must-Run, Should-Run, Defer,
+               Retire Candidates, Flaky Critical Coverage,
+               Suite Health Summary, Warnings
 ```
 
 **What this means in practice:**
@@ -41,6 +49,7 @@ Input YAML
 - A test covering a high-risk story scores 3.3× higher than the same test covering a low-risk story.
 - NFR elevation bypasses scoring entirely — performance and security tests run unconditionally when sprint risk is high.
 - Budget overflow trims from the bottom of must-run, never from overrides.
+- Warnings surface silent decisions — e.g. a high-risk story with no must-run coverage, or a test whose flakiness pushed it below the must-run threshold. Warnings are advisory: they do not change tier assignments.
 
 For the complete formula derivation with worked examples, see [SCORING-FORMULA](SCORING-FORMULA.md). For writing benchmarks that validate this pipeline, see [BENCHMARK-AUTHORING](BENCHMARK-AUTHORING.md).
 

@@ -40,7 +40,7 @@ Performed by `input_loader.py` during every `iro run` invocation.
 Performed by `output_validator.py` after report rendering. Runs automatically inside `iro run`.
 
 **Checks:**
-- All 7 required headings present (line-anchored)
+- All **8** required headings present (line-anchored)
 - All 8 required labels present exactly once
 - No label duplicated
 - Each label in its declared section

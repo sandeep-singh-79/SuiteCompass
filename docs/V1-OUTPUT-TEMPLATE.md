@@ -1,6 +1,6 @@
 # V1 Output Template
 
-Annotated reference for the SuiteCompass optimisation report. The output is a structured markdown document with 7 required sections and 8 machine-checkable labels.
+Annotated reference for the SuiteCompass optimisation report. The output is a structured markdown document with **8 required sections** and 8 machine-checkable labels.
 
 ---
 
@@ -14,7 +14,7 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 
 ---
 
-## Required Sections (7)
+## Required Sections (8)
 
 | # | Heading | Purpose |
 |---|---|---|
@@ -25,6 +25,7 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 | 5 | `## Retire Candidates` | Tests recommended for removal from the suite |
 | 6 | `## Flaky Critical Coverage` | Flaky tests with unique coverage that must still run |
 | 7 | `## Suite Health Summary` | Aggregate health metrics for the test suite |
+| 8 | `## Warnings` | Situational warnings about silent scoring decisions |
 
 ---
 
@@ -88,6 +89,10 @@ _No retire candidates._
 Flakiness Tier High: 1 tests above threshold
 Total automated execution time (must-run): 4 min
 Time budget: 20 min
+
+## Warnings
+
+_No warnings._
 ```
 
 ---
@@ -144,6 +149,24 @@ Manual tests are **never** retire candidates.
 - **Total automated execution time (must-run)** — sum of `execution_time_secs` for automated must-run tests, in minutes
 - **Time budget** — the configured `time_budget_mins`
 
+### Warnings
+
+Situational warnings surfaced by `_compute_warnings()` after tiering is complete. Always present — either warning lines or `_No warnings._`.
+
+Warning IDs and their meaning:
+
+| Warning ID | Triggered when |
+|---|---|
+| `COVERAGE-GAP` | All tests covering a medium/high-risk story area have been retired |
+| `OVERRIDE-BUDGET` | Override tests alone exceed the configured time budget |
+| `UNIQUE-DEMOTED` | A test with unique coverage was demoted by budget constraint |
+| `NO-MUST-RUN-COVERAGE` | A high-risk story has no must-run test covering it |
+| `ZERO-BUDGET` | Time budget is 0, causing all scored tests to be demoted |
+| `NFR-NO-OVERLAP` | NFR-elevated test(s) have no sprint story coverage overlap |
+| `FLAKINESS-REVERSED` | Flakiness reduced a test below must-run despite high-risk coverage |
+
+Warnings are **advisory only** — they do not change tier assignments.
+
 ---
 
 ## Tier Assignment Rules
@@ -164,7 +187,7 @@ Overrides take priority — a test with an override is always must-run even if i
 
 The output validator (`output_validator.py`) checks:
 
-1. All 7 headings present, line-anchored (`line.rstrip() == heading`)
+1. All **8** headings present, line-anchored (`line.rstrip() == heading`)
 2. All 8 labels present exactly once
 3. No label duplicated
 4. Each label appears in its declared section (not globally)

@@ -140,7 +140,8 @@ nfr_elevation_required = (sprint_risk_level == "high")
 high_flakiness_count = count(tests where flakiness_rate > flakiness_high_tier_threshold)
 ratio = high_flakiness_count / total_test_count
 
-if ratio > 0.20 → "degraded"
+if no tests in suite → "unknown"
+elif ratio > 0.20 → "degraded"
 elif ratio < 0.05 → "stable"
 else → "moderate"
 ```
@@ -233,6 +234,31 @@ Flaky-critical classification runs after the retire check and before final tier 
 7.  Apply overrides (mandatory tag, NFR elevation)
 8.  Assign initial tiers  (flaky-critical tests placed in flaky_critical list)
 9.  Apply budget constraint (demote lowest-scored must-run; flaky-critical exempt)
-10. Render report
-11. Validate output contract
+10. Compute situational warnings
+11. Render report
+12. Validate output contract
 ```
+
+---
+
+## Warnings System
+
+After tiering and budget constraint, `_compute_warnings()` inspects the final tier state and emits advisory warning strings. Warnings do **not** change any tier assignment — they surface information about silent decisions that happened during scoring.
+
+Warnings are rendered in the `## Warnings` section of the report. Each warning has a stable ID prefix (e.g. `[COVERAGE-GAP]`) so teams can filter or suppress by ID.
+
+### Warning IDs
+
+| ID | Condition |
+|---|---|
+| `COVERAGE-GAP` | For a medium/high-risk story area, every test covering that area has been retired — leaving the area uncovered |
+| `OVERRIDE-BUDGET` | Override-only execution time exceeds the configured budget (overrides are exempt from demotion, so the team should be aware) |
+| `UNIQUE-DEMOTED` | Budget constraint demoted a test that holds unique coverage for a sprint area — that area is now unverified |
+| `NO-MUST-RUN-COVERAGE` | A high-risk story has no must-run test covering its changed areas |
+| `ZERO-BUDGET` | `time_budget_mins` is 0; all scored must-run tests were demoted |
+| `NFR-NO-OVERLAP` | One or more NFR-elevated tests have no coverage overlap with any sprint story's changed areas |
+| `FLAKINESS-REVERSED` | A test covers a high-risk story but its flakiness penalty dropped its score below the must-run threshold |
+
+### Warning Guarantee
+
+The `## Warnings` section is always present in the report. If no warnings fired, it renders `_No warnings._`.
