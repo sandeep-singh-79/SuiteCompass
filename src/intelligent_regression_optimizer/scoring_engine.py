@@ -138,6 +138,21 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
 
     must_run = override_must_run + scored_must_run
 
+    # --- 6. Compute situational warnings -----------------------------------
+    warnings = _compute_warnings(
+        stories=stories,
+        tests=tests,
+        must_run=must_run,
+        should_run=should_run,
+        defer=defer,
+        retire=retire,
+        override_must_run=override_must_run,
+        demoted=demoted,
+        unique_coverage=unique_coverage,
+        budget_mins=budget_mins,
+        nfr_elevation=nfr_elevation,
+    )
+
     return TierResult(
         must_run=must_run,
         should_run=should_run,
@@ -145,6 +160,7 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
         retire=retire,
         budget_overflow=budget_overflow,
         flaky_critical=flaky_critical,
+        warnings=warnings,
     )
 
 
@@ -327,3 +343,132 @@ def _apply_budget_constraint(
         demoted.append(candidate)
 
     return remaining, demoted, True
+
+
+# ---------------------------------------------------------------------------
+# Warning detection
+# ---------------------------------------------------------------------------
+
+def _compute_warnings(
+    *,
+    stories: list[dict],
+    tests: list[dict],
+    must_run: list[ScoredTest],
+    should_run: list[ScoredTest],
+    defer: list[ScoredTest],
+    retire: list[ScoredTest],
+    override_must_run: list[ScoredTest],
+    demoted: list[ScoredTest],
+    unique_coverage: set[str],
+    budget_mins: float,
+    nfr_elevation: bool,
+) -> list[str]:
+    """Detect and return situational warning strings for a sprint run."""
+    warnings: list[str] = []
+    retire_ids: set[str] = {s.test_id for s in retire}
+    must_run_ids: set[str] = {s.test_id for s in must_run}
+    test_map: dict[str, dict] = {t["id"]: t for t in tests}
+
+    # W5: ZERO-BUDGET — budget is 0
+    if budget_mins == 0:
+        warnings.append("[ZERO-BUDGET] Time budget is 0 — all scored tests were demoted.")
+
+    # W1: COVERAGE-GAP — all tests covering a sprint area are retired
+    for story in stories:
+        if story.get("risk") not in {"medium", "high"}:
+            continue
+        for area in story.get("changed_areas", []):
+            covering = [
+                t for t in tests
+                if area in t.get("coverage_areas", [])
+            ]
+            if not covering:
+                continue  # No tests at all for area — different problem
+            if all(t["id"] in retire_ids for t in covering):
+                warnings.append(
+                    f"[COVERAGE-GAP] All tests covering area '{area}'"
+                    f" (story {story['id']}) have been retired."
+                )
+
+    # W2: OVERRIDE-BUDGET — override tests alone exceed budget
+    override_exec_mins = sum(
+        test_map[s.test_id].get("execution_time_secs", 0) / 60.0
+        for s in override_must_run
+        if s.test_id in test_map and test_map[s.test_id].get("automated", True)
+    )
+    if override_exec_mins > budget_mins > 0:
+        warnings.append(
+            f"[OVERRIDE-BUDGET] Override tests total {override_exec_mins:.0f} min"
+            f" which exceeds the {budget_mins:.0f}-min budget."
+        )
+
+    # W3: UNIQUE-DEMOTED — budget demotion dropped a test with unique coverage
+    for st in demoted:
+        test = test_map.get(st.test_id, {})
+        for area in test.get("coverage_areas", []):
+            if area in unique_coverage:
+                warnings.append(
+                    f"[UNIQUE-DEMOTED] '{st.name}' (id: {st.test_id}) was demoted"
+                    f" by budget constraint but holds unique coverage for area '{area}'."
+                )
+                break  # one warning per test is enough
+
+    # W4: NO-MUST-RUN-COVERAGE — high-risk story has no must-run test covering it
+    for story in stories:
+        if story.get("risk") != "high":
+            continue
+        changed = set(story.get("changed_areas", []))
+        if not changed:
+            continue
+        covered = any(
+            changed & set(test_map[s.test_id].get("coverage_areas", []))
+            for s in must_run
+            if s.test_id in test_map
+        )
+        if not covered:
+            warnings.append(
+                f"[NO-MUST-RUN-COVERAGE] High-risk story {story['id']}"
+                f" (areas: {sorted(changed)}) has no must-run test covering it."
+            )
+
+    # W7: NFR-NO-OVERLAP — NFR-elevated tests have no sprint coverage overlap
+    if nfr_elevation:
+        nfr_tests = [
+            s for s in override_must_run
+            if s.override_reason == "nfr-elevation" and s.test_id in test_map
+        ]
+        all_changed: set[str] = set()
+        for story in stories:
+            all_changed.update(story.get("changed_areas", []))
+        no_overlap = [
+            s for s in nfr_tests
+            if not (set(test_map[s.test_id].get("coverage_areas", [])) & all_changed)
+        ]
+        if no_overlap:
+            warnings.append(
+                f"[NFR-NO-OVERLAP] {len(no_overlap)} NFR-elevated test(s) have no"
+                " coverage overlap with any sprint story's changed areas."
+            )
+
+    # W8: FLAKINESS-REVERSED — flakiness pushed a high-risk-covering test below must-run
+    for st in should_run + defer:
+        if st.flakiness_rate <= 0:
+            continue
+        test = test_map.get(st.test_id, {})
+        coverage = set(test.get("coverage_areas", []))
+        for story in stories:
+            if story.get("risk") != "high":
+                continue
+            if coverage & set(story.get("changed_areas", [])):
+                # Would this test be must-run without flakiness?
+                score_without_flakiness = st.raw_score + 8 * st.flakiness_rate
+                if score_without_flakiness >= TIER_MUST_RUN:
+                    warnings.append(
+                        f"[FLAKINESS-REVERSED] '{st.name}' (id: {st.test_id}) covers"
+                        f" high-risk story {story['id']} but flakiness"
+                        f" ({st.flakiness_rate:.2f}) reduced its score below the"
+                        " must-run threshold."
+                    )
+                    break  # one warning per test
+
+    return warnings

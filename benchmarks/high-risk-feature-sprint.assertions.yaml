@@ -8,6 +8,7 @@ must_include_headings:
   - "## Defer To Overnight Run"
   - "## Retire Candidates"
   - "## Suite Health Summary"
+  - "## Warnings"
 
 must_include_labels:
   - "Recommendation Mode:"

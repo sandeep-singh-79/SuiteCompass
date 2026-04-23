@@ -139,3 +139,19 @@ class TestTierResultFlakyCriticalList:
         )
         assert tr.must_run == []
         assert tr.budget_overflow is False
+
+
+class TestTierResultWarnings:
+    def test_warnings_defaults_empty(self):
+        tr = TierResult()
+        assert tr.warnings == []
+
+    def test_warnings_accepts_strings(self):
+        tr = TierResult(warnings=["[COVERAGE-GAP] area Checkout has no coverage"])
+        assert len(tr.warnings) == 1
+        assert "COVERAGE-GAP" in tr.warnings[0]
+
+    def test_warnings_independent_of_other_fields(self):
+        tr = TierResult(must_run=[], flaky_critical=[], warnings=["w1", "w2"])
+        assert tr.warnings == ["w1", "w2"]
+        assert tr.must_run == []

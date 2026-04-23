@@ -123,10 +123,10 @@ class TestSuiteHealth:
         result = classify_context(normalized)
         assert result["suite_health"] == "moderate"
 
-    def test_empty_suite_returns_stable(self):
+    def test_empty_suite_returns_unknown(self):
         normalized = _make_normalized([_story("S1", "low")], [])
         result = classify_context(normalized)
-        assert result["suite_health"] == "stable"
+        assert result["suite_health"] == "unknown"
 
 
 # ---------------------------------------------------------------------------

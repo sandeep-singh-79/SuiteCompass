@@ -43,6 +43,10 @@ Budget Overflow: no
 
 Flakiness Tier High: 3 tests above 0.20
 Total automated execution time (must-run): 14 min
+
+## Warnings
+
+_No warnings._
 """
 
 
@@ -60,6 +64,7 @@ class TestMissingHeadings:
         "## Defer To Overnight Run",
         "## Retire Candidates",
         "## Suite Health Summary",
+        "## Warnings",
     ])
     def test_missing_heading_fails(self, heading):
         broken = "\n".join(
@@ -191,3 +196,22 @@ class TestFlakyCriticalOutputContract:
         )
         result = validate_output(broken)
         assert not result.is_valid
+
+
+# ---------------------------------------------------------------------------
+# Warnings section heading
+# ---------------------------------------------------------------------------
+
+class TestWarningsHeading:
+    def test_missing_warnings_heading_fails(self):
+        broken = "\n".join(
+            line for line in VALID_OUTPUT.splitlines()
+            if line.rstrip() != "## Warnings"
+        )
+        result = validate_output(broken)
+        assert not result.is_valid
+        assert any("## Warnings" in e for e in result.errors)
+
+    def test_warnings_heading_present_passes(self):
+        result = validate_output(VALID_OUTPUT)
+        assert result.is_valid, result.errors

@@ -15,6 +15,7 @@ REQUIRED_HEADINGS: list[str] = [
     "## Defer To Overnight Run",
     "## Retire Candidates",
     "## Suite Health Summary",
+    "## Warnings",
 ]
 
 # Maps each required label to the heading of the section it must appear in.

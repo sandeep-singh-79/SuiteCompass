@@ -72,7 +72,7 @@ def _derive_sprint_risk(stories: list[dict]) -> str:
 
 def _derive_suite_health(tests: list[dict], constraints: dict) -> str:
     if not tests:
-        return "stable"
+        return "unknown"
     threshold = constraints.get("flakiness_high_tier_threshold", 0.20)
     above = sum(1 for t in tests if t.get("flakiness_rate", 0) > threshold)
     ratio = above / len(tests)

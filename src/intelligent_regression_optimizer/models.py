@@ -52,6 +52,7 @@ class TierResult:
     retire: list[ScoredTest] = field(default_factory=list)
     budget_overflow: bool = False
     flaky_critical: list[ScoredTest] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass

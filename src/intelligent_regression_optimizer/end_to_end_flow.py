@@ -125,7 +125,7 @@ def run_pipeline(
         normalized = apply_area_map(normalized, changed_areas)
 
     result = _run_from_package(normalized)
-    result.warnings = history_warnings
+    result.warnings = history_warnings + result.warnings
     return result
 
 
@@ -163,7 +163,7 @@ def run_pipeline_from_merged(
         normalized = apply_area_map(normalized, changed_areas)
 
     result = _run_from_package(normalized)
-    result.warnings = history_warnings
+    result.warnings = history_warnings + result.warnings
     return result
 
 

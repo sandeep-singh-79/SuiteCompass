@@ -40,7 +40,9 @@ def _valid_markdown() -> str:
         "## Retire Candidates\n\n"
         "_No retire candidates._\n\n"
         "## Suite Health Summary\n\n"
-        "Flakiness Tier High: 0 tests above threshold\n"
+        "Flakiness Tier High: 0 tests above threshold\n\n"
+        "## Warnings\n\n"
+        "_No warnings._\n"
     )
 
 

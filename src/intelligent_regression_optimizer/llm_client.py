@@ -62,6 +62,10 @@ Total automated execution time (must-run): 2 min
 Time budget: 60 min
 Suite stability is strong. No flaky tests were detected above the high-tier
 threshold. No remediation actions are required for the current sprint cycle.
+
+## Warnings
+
+_No warnings._
 """
 
 

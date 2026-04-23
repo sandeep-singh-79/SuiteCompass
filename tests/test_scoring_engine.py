@@ -594,3 +594,198 @@ class TestFlakyCriticalDetection:
         assert t1.is_override is True
         # Must NOT appear in flaky_critical
         assert not any(s.test_id == "T1" for s in result.flaky_critical)
+
+
+# ---------------------------------------------------------------------------
+# Phase B: Situational Warnings
+# ---------------------------------------------------------------------------
+
+class TestWarnings:
+    """Each test verifies one warning ID is emitted under the right conditions."""
+
+    def _has_warning(self, result, warning_id: str) -> bool:
+        return any(warning_id in w for w in result.warnings)
+
+    # ------------------------------------------------------------------
+    # W1: COVERAGE-GAP — all tests covering a sprint area are retired
+    # ------------------------------------------------------------------
+    def test_warning_coverage_gap_all_tests_retire_for_sprint_area(self):
+        # T1 and T2 both cover Checkout (so neither is unique → both can retire).
+        # Both have very high flakiness → both retire.
+        # A medium-risk story touches Checkout → gap should be warned.
+        stories = [_story("S1", "medium", ["Checkout"])]
+        tests = [
+            _test("T1", ["Checkout"], flakiness=0.95),  # high flakiness, non-unique
+            _test("T2", ["Checkout"], flakiness=0.95),  # high flakiness, non-unique
+        ]
+        result = score_tests(_normalized(stories, tests), _classifications("medium"))
+        assert any(t.test_id == "T1" for t in result.retire), "T1 should retire"
+        assert any(t.test_id == "T2" for t in result.retire), "T2 should retire"
+        assert self._has_warning(result, "COVERAGE-GAP"), f"Expected COVERAGE-GAP; got {result.warnings}"
+
+    def test_no_coverage_gap_warning_when_non_retired_test_covers_area(self):
+        # T1 covers Checkout (clean), T2 covers Checkout (flaky→retire).
+        # T1 still active → no COVERAGE-GAP.
+        stories = [_story("S1", "medium", ["Checkout"])]
+        tests = [
+            _test("T1", ["Checkout"], flakiness=0.0),   # stays active
+            _test("T2", ["Checkout"], flakiness=0.95),  # retires
+        ]
+        result = score_tests(_normalized(stories, tests), _classifications("medium"))
+        assert not self._has_warning(result, "COVERAGE-GAP")
+
+    # ------------------------------------------------------------------
+    # W2: OVERRIDE-BUDGET — override tests alone exceed budget
+    # ------------------------------------------------------------------
+    def test_warning_override_budget_exceeded(self):
+        # Two mandatory tests each take 40 min → 80 min total > 60 min budget.
+        stories = [_story("S1", "low", ["Billing"])]
+        tests = [
+            _test("T1", ["Billing"], exec_secs=2400, tags=["smoke"]),  # 40 min
+            _test("T2", ["Billing"], exec_secs=2400, tags=["smoke"]),  # 40 min
+        ]
+        result = score_tests(
+            _normalized(stories, tests, mandatory_tags=["smoke"]),
+            _classifications("low"),
+        )
+        assert self._has_warning(result, "OVERRIDE-BUDGET"), f"Expected OVERRIDE-BUDGET; got {result.warnings}"
+
+    def test_no_override_budget_warning_when_overrides_fit(self):
+        # One mandatory test takes 10 min → 10 min < 60 min budget → no warning.
+        stories = [_story("S1", "low", ["Billing"])]
+        tests = [_test("T1", ["Billing"], exec_secs=600, tags=["smoke"])]  # 10 min
+        result = score_tests(
+            _normalized(stories, tests, mandatory_tags=["smoke"]),
+            _classifications("low"),
+        )
+        assert not self._has_warning(result, "OVERRIDE-BUDGET")
+
+    # ------------------------------------------------------------------
+    # W3: UNIQUE-DEMOTED — budget demotion dropped a test with unique coverage
+    # ------------------------------------------------------------------
+    def test_warning_unique_coverage_demoted_under_budget(self):
+        # T1 covers "UniqueArea" (only test for it), T2 also high-score but large.
+        # Budget forces demotion of T1 → warn.
+        stories = [_story("S1", "high", ["UniqueArea"])]
+        # T1: unique-covering, large exec time
+        # T2: different area, large exec time
+        # Budget = 5 min → T1 demoted after T2 consumed budget
+        tests = [
+            _test("T1", ["UniqueArea"], exec_secs=300),    # 5 min
+            _test("T2", ["SomeOtherArea"], exec_secs=300), # 5 min
+        ]
+        # With 4-min budget, both T1 and T2 exceed budget individually → both demote
+        result = score_tests(
+            _normalized(stories, tests, budget_mins=4),
+            _classifications("high"),
+        )
+        assert self._has_warning(result, "UNIQUE-DEMOTED"), f"Expected UNIQUE-DEMOTED; got {result.warnings}"
+
+    # ------------------------------------------------------------------
+    # W4: NO-MUST-RUN-COVERAGE — high-risk story has no must-run test
+    # ------------------------------------------------------------------
+    def test_warning_no_must_run_for_high_risk_story(self):
+        # High-risk story touches "PaymentCore"; only test covers it but scores below must-run.
+        # score = 10 × 1 × 1.0 − 8 × 0.0 = 10.0 normally... need score < 8.
+        # Use medium risk → score = 6.0 → should-run, not must-run.
+        stories = [_story("S1", "high", ["PaymentCore"])]
+        # Test covers PaymentCore but flakiness drags score below must-run threshold.
+        # score = 10 - 8*0.35 = 10 - 2.8 = 7.2 < 8 → should-run
+        tests = [_test("T1", ["PaymentCore"], flakiness=0.35)]
+        result = score_tests(_normalized(stories, tests), _classifications("high"))
+        # T1 should NOT be in must_run (score 7.2 < 8)
+        assert not any(s.test_id == "T1" for s in result.must_run), "T1 should not be must-run"
+        assert self._has_warning(result, "NO-MUST-RUN-COVERAGE"), f"Expected NO-MUST-RUN-COVERAGE; got {result.warnings}"
+
+    def test_no_coverage_warning_when_must_run_covers_high_risk_story(self):
+        # Clean test covers high-risk story at score=10 → must-run → no warning.
+        stories = [_story("S1", "high", ["PaymentCore"])]
+        tests = [_test("T1", ["PaymentCore"], flakiness=0.0)]
+        result = score_tests(_normalized(stories, tests), _classifications("high"))
+        assert any(s.test_id == "T1" for s in result.must_run)
+        assert not self._has_warning(result, "NO-MUST-RUN-COVERAGE")
+
+    # ------------------------------------------------------------------
+    # W5: ZERO-BUDGET — budget is 0, causing total demotion
+    # ------------------------------------------------------------------
+    def test_warning_zero_budget_total_demotion(self):
+        stories = [_story("S1", "high", ["Auth"])]
+        tests = [_test("T1", ["Auth"])]
+        result = score_tests(
+            _normalized(stories, tests, budget_mins=0),
+            _classifications("high"),
+        )
+        assert self._has_warning(result, "ZERO-BUDGET"), f"Expected ZERO-BUDGET; got {result.warnings}"
+
+    def test_no_zero_budget_warning_with_positive_budget(self):
+        stories = [_story("S1", "high", ["Auth"])]
+        tests = [_test("T1", ["Auth"])]
+        result = score_tests(
+            _normalized(stories, tests, budget_mins=60),
+            _classifications("high"),
+        )
+        assert not self._has_warning(result, "ZERO-BUDGET")
+
+    # ------------------------------------------------------------------
+    # W7: NFR-NO-OVERLAP — NFR-elevated test has no sprint story coverage overlap
+    # ------------------------------------------------------------------
+    def test_warning_nfr_elevation_without_sprint_overlap(self):
+        # Story touches "Checkout"; NFR-elevation adds a performance test covering "Auth".
+        # No overlap between "Auth" and "Checkout" → warn.
+        stories = [_story("S1", "high", ["Checkout"])]
+        tests = [_test("T-PERF", ["Auth"], layer="performance")]
+        result = score_tests(
+            _normalized(stories, tests),
+            _classifications("high", nfr_elevation=True),
+        )
+        # T-PERF gets nfr-elevation override
+        assert any(s.test_id == "T-PERF" for s in result.must_run)
+        assert self._has_warning(result, "NFR-NO-OVERLAP"), f"Expected NFR-NO-OVERLAP; got {result.warnings}"
+
+    def test_no_nfr_overlap_warning_when_overlap_exists(self):
+        # NFR test covers same area as sprint story.
+        stories = [_story("S1", "high", ["Checkout"])]
+        tests = [_test("T-PERF", ["Checkout"], layer="performance")]
+        result = score_tests(
+            _normalized(stories, tests),
+            _classifications("high", nfr_elevation=True),
+        )
+        assert not self._has_warning(result, "NFR-NO-OVERLAP")
+
+    # ------------------------------------------------------------------
+    # W8: FLAKINESS-REVERSED — flakiness pushed a high-risk-covering test below must-run
+    # ------------------------------------------------------------------
+    def test_warning_flakiness_reversed_must_run(self):
+        # Without flakiness: score = 10*1*1.0 = 10.0 → must-run.
+        # With flakiness 0.28: score = 10 - 8*0.28 = 7.76 → should-run.
+        # T2 also covers PaymentFlow → T1 not unique → T1 not flaky-critical → lands in should-run.
+        # f=0.28 < retire threshold (0.30) → T1 stays active in should-run.
+        # Warn that flakiness reversed the must-run decision.
+        stories = [_story("S1", "high", ["PaymentFlow"])]
+        tests = [
+            _test("T1", ["PaymentFlow"], flakiness=0.28),  # non-unique, below retire threshold
+            _test("T2", ["PaymentFlow"], flakiness=0.0),   # clean → must-run
+        ]
+        result = score_tests(_normalized(stories, tests), _classifications("high"))
+        assert not any(s.test_id == "T1" for s in result.must_run), "T1 should not be must-run"
+        assert not any(s.test_id == "T1" for s in result.retire), "T1 should not retire"
+        assert self._has_warning(result, "FLAKINESS-REVERSED"), f"Expected FLAKINESS-REVERSED; got {result.warnings}"
+
+    def test_no_flakiness_reversed_warning_when_test_is_must_run(self):
+        # Clean test stays in must-run → no reversal.
+        stories = [_story("S1", "high", ["PaymentFlow"])]
+        tests = [
+            _test("T1", ["PaymentFlow"], flakiness=0.0),
+            _test("T2", ["PaymentFlow"], flakiness=0.0),
+        ]
+        result = score_tests(_normalized(stories, tests), _classifications("high"))
+        assert any(s.test_id == "T1" for s in result.must_run)
+        assert not self._has_warning(result, "FLAKINESS-REVERSED")
+
+    def test_no_warnings_emitted_for_clean_sprint(self):
+        # Clean sprint: no retires, overrides within budget, all high-risk stories covered.
+        stories = [_story("S1", "high", ["Checkout"])]
+        tests = [_test("T1", ["Checkout"], flakiness=0.0)]
+        result = score_tests(_normalized(stories, tests), _classifications("high"))
+        assert result.warnings == [], f"Expected no warnings; got {result.warnings}"
+

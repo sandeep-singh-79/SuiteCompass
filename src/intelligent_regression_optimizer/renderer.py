@@ -163,4 +163,16 @@ def render_report(
     lines.append(f"Time budget: {budget_mins:.0f} min")
     lines.append("")
 
+    # ------------------------------------------------------------------
+    # Section 7: Warnings
+    # ------------------------------------------------------------------
+    lines.append("## Warnings")
+    lines.append("")
+    if tier_result.warnings:
+        for w in tier_result.warnings:
+            lines.append(f"- {w}")
+    else:
+        lines.append("_No warnings._")
+    lines.append("")
+
     return "\n".join(lines)
