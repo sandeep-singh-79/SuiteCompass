@@ -20,6 +20,15 @@ def _fmt_retire(st: ScoredTest) -> str:
     return f"- {st.test_id} {st.name} (flakiness: {st.flakiness_rate:.2f}, no unique coverage)"
 
 
+def _fmt_flaky_critical(st: ScoredTest) -> str:
+    reason = st.flaky_critical_reason or ""
+    return (
+        f"- {st.test_id} {st.name} "
+        f"(flakiness: {st.flakiness_rate:.2f}, {reason}, "
+        f"action: stabilize or replace)"
+    )
+
+
 def _count_flakiness_high(normalized: dict[str, Any]) -> int:
     threshold = normalized["constraints"].get("flakiness_high_tier_threshold", 0.20)
     return sum(
@@ -44,7 +53,7 @@ def render_report(
 ) -> str:
     """Render a structured markdown report from scoring results.
 
-    Produces all 6 required sections with all 7 required labels.
+    Produces all 7 required sections with all 8 required labels.
     """
     sprint_risk: str = classifications.get("sprint_risk_level", "unknown")
     nfr_elevation: bool = classifications.get("nfr_elevation_required", False)
@@ -66,6 +75,7 @@ def render_report(
     lines.append("Recommendation Mode: deterministic")
     lines.append(f"Sprint Risk Level: {sprint_risk}")
     lines.append(f"Total Must-Run: {len(tier_result.must_run)}")
+    lines.append(f"Total Flaky Critical: {len(tier_result.flaky_critical)}")
     lines.append(f"Total Retire Candidates: {len(tier_result.retire)}")
     lines.append(f"NFR Elevation: {nfr_value}")
     lines.append(f"Budget Overflow: {overflow_value}")
@@ -81,6 +91,30 @@ def render_report(
             lines.append(_fmt_test(st))
     else:
         lines.append("_No tests in this tier._")
+    lines.append("")
+
+    # ------------------------------------------------------------------
+    # Section 2b: Flaky Critical Coverage
+    # ------------------------------------------------------------------
+    rerun_max: int = normalized["constraints"].get("flaky_critical_rerun_max", 2)
+    lines.append("## Flaky Critical Coverage")
+    lines.append("")
+    if tier_result.flaky_critical:
+        lines.append(
+            "These tests cover sprint-impacted areas with unique coverage but are too "
+            "unreliable to serve as clean release gates. Execute them, but do not block "
+            f"on a single failure. Recommended: rerun up to {rerun_max} times on failure."
+        )
+        lines.append("")
+        for st in tier_result.flaky_critical:
+            lines.append(_fmt_flaky_critical(st))
+        lines.append("")
+        lines.append(
+            "Stabilisation is required. These tests cannot be retired without leaving "
+            "critical areas uncovered."
+        )
+    else:
+        lines.append("_No flaky-critical tests._")
     lines.append("")
 
     # ------------------------------------------------------------------

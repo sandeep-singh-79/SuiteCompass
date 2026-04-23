@@ -104,6 +104,12 @@ def validate_raw(raw: dict[str, Any]) -> dict[str, Any]:
     # Required top-level keys
     _require_keys(raw, ["sprint_context", "test_suite", "constraints"], "root")
 
+    # Validate constraints is a mapping
+    if not isinstance(raw["constraints"], dict):
+        raise InputValidationError(
+            f"constraints must be a mapping, got {type(raw['constraints']).__name__}"
+        )
+
     sprint = raw["sprint_context"]
     _require_keys(sprint, ["stories"], "sprint_context")
 
@@ -142,6 +148,20 @@ def validate_raw(raw: dict[str, Any]) -> dict[str, Any]:
         raise InputValidationError(
             f"constraints.mandatory_tags must be a list, got {type(mandatory_tags).__name__}"
         )
+
+    # Validate and default flaky_critical_rerun_max
+    rerun_max = constraints.get("flaky_critical_rerun_max", 2)
+    if not isinstance(rerun_max, int) or isinstance(rerun_max, bool):
+        raise InputValidationError(
+            "constraints.flaky_critical_rerun_max must be an integer"
+        )
+    if rerun_max < 1 or rerun_max > 5:
+        raise InputValidationError(
+            "constraints.flaky_critical_rerun_max must be between 1 and 5"
+        )
+    # Inject default into the constraints dict that will flow into normalized
+    if "flaky_critical_rerun_max" not in constraints:
+        raw["constraints"]["flaky_critical_rerun_max"] = 2
 
     # Resolve 1-hop dependencies
     resolved_stories = _resolve_deps(stories)

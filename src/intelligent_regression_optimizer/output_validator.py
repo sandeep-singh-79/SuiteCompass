@@ -10,6 +10,7 @@ from intelligent_regression_optimizer.models import ValidationResult
 REQUIRED_HEADINGS: list[str] = [
     "## Optimisation Summary",
     "## Must-Run",
+    "## Flaky Critical Coverage",
     "## Should-Run If Time Permits",
     "## Defer To Overnight Run",
     "## Retire Candidates",
@@ -21,6 +22,7 @@ LABEL_SECTION_MAP: dict[str, str] = {
     "Recommendation Mode:": "## Optimisation Summary",
     "Sprint Risk Level:": "## Optimisation Summary",
     "Total Must-Run:": "## Optimisation Summary",
+    "Total Flaky Critical:": "## Optimisation Summary",
     "Total Retire Candidates:": "## Optimisation Summary",
     "NFR Elevation:": "## Optimisation Summary",
     "Budget Overflow:": "## Optimisation Summary",
@@ -66,8 +68,8 @@ def validate_output(markdown: str) -> ValidationResult:
     """Validate a rendered report against the output contract.
 
     Checks performed:
-    1. All 6 required headings present (line-anchored).
-    2. All 7 required labels present exactly once.
+    1. All 7 required headings present (line-anchored).
+    2. All 8 required labels present exactly once.
     3. No label appears more than once.
     4. Each label appears in its declared section.
 

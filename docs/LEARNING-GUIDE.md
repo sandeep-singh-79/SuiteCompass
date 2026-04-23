@@ -216,7 +216,58 @@ When history data is available it is merged into the normalized input *before* s
 
 ---
 
-## 5. Common Mistakes in Regression Prioritisation
+## 5. Interpreting the Flaky Critical Coverage Section
+
+The `## Flaky Critical Coverage` section appears whenever at least one test is both highly flaky **and** the only test that covers some sprint-relevant area. It is one of the most important signals SuiteCompass emits, because it represents a risk the scoring formula alone cannot resolve.
+
+### What it means
+
+A test in this section:
+- Has `flakiness_rate > flakiness_high_tier_threshold` (default 0.20) — it fails spuriously often enough to erode developer trust
+- Covers a story area that is being changed this sprint (`coverage_areas ∩ story.changed_areas`)
+- Covers that area **uniquely** — no other test in the suite watches the same code path
+
+The scoring formula has already penalised this test's score (−8 × flakiness_rate). Without the flaky-critical classification, it might land in Defer or Should-Run and be skipped under budget pressure — leaving its unique area completely unchecked.
+
+### The unique coverage gate
+
+The key criterion is **unique coverage**. A flaky test that covers areas also covered by other (stable) tests is handled differently:
+
+| Unique coverage? | Result |
+|---|---|
+| Yes | Flaky-critical — must run, report signals invest/replace |
+| No | Retire candidate — safe to remove, other tests cover the area |
+
+This is why the same flakiness threshold can produce two completely different outcomes depending on whether other tests provide safety cover.
+
+### Execution policy
+
+- **Always run** — budget-exempt, never demoted by budget overflow, treated like a hard override
+- **Rerun on failure** — the report recommends rerunning up to `flaky_critical_rerun_max` times (default 2) before treating a failure as confirmed
+- **Does not gate the release** — a flaky-critical failure is a signal, not a hard block; the team decides
+
+### The `stabilize or replace` action
+
+Every flaky-critical test gets a `stabilize or replace` annotation. This is not a severity label — it is a team action prompt. Two valid responses:
+
+1. **Stabilize** — fix the root cause of the flakiness (timing issues, environment coupling, brittle assertions)
+2. **Replace** — write a new stable test covering the same area, then retire the flaky one
+
+Leaving a test in the flaky-critical list sprint after sprint is a warning sign: the team is acknowledging risk without addressing it.
+
+### Contrast with Retire Candidates
+
+| Aspect | Flaky-Critical | Retire Candidate |
+|---|---|---|
+| Unique coverage | Yes | No |
+| Must run | Yes (always) | No (remove) |
+| Budget impact | Exempt | N/A |
+| Team action | Stabilize or replace | Archive/delete |
+| Appears in scored tiers | No | No |
+
+---
+
+## 6. Common Mistakes in Regression Prioritisation
 
 ### Mistake 1: Running Everything by Default
 

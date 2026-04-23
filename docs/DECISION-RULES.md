@@ -174,18 +174,65 @@ stability = 1.0 - (0.7 × flakiness_rate + 0.3 × min(failure_count_last_30d / 1
 
 ---
 
+## Flaky-Critical Classification
+
+A **flaky-critical** test is a cross-cutting classification applied *after* scoring. It is not a scored tier — it is an execution directive that overrides tier placement for a specific set of tests.
+
+### Qualification Criteria (all four must be true)
+
+| # | Criterion | Field / threshold |
+|---|---|---|
+| 1 | Test is automated | `automated: true` |
+| 2 | Flakiness rate exceeds the high-tier threshold | `flakiness_rate > constraints.flakiness_high_tier_threshold` (default 0.20) |
+| 3 | Test has direct coverage of a sprint story's changed areas | `coverage_areas ∩ story.changed_areas ≠ ∅` for a story with `risk: medium` or `risk: high` |
+| 4 | Test has unique coverage | at least one `coverage_area` not covered by any other test in the suite |
+
+### Decision Table
+
+| flakiness > threshold | covers story area | unique coverage | Automated | Result |
+|---|---|---|---|---|
+| Yes | Yes | Yes | Yes | **Flaky-Critical** |
+| Yes | Yes | No | Yes | Retire candidate (no unique coverage) |
+| Yes | No | Yes | Yes | Scored tier (no story coverage) |
+| No | Yes | Yes | Yes | Scored tier (not flaky enough) |
+| Any | Any | Any | No (manual) | Scored tier (manual tests exempt) |
+
+### Execution Rules
+
+- **Always execute** — flaky-critical tests must run every sprint regardless of budget
+- **Budget-exempt** — never counted against `time_budget_mins` and never demoted by budget overflow
+- **Never gates release** — these tests are flagged for investigation, not for blocking
+- **Rerun on failure** — the report recommends rerunning up to `constraints.flaky_critical_rerun_max` times (default 2) before treating a failure as confirmed
+- **Stabilize or replace** — the report emits a `stabilize or replace` action for every flaky-critical test to prompt the team to invest in fixing the test or replacing it with a stable equivalent
+- **Dedicated report section** — rendered under `## Flaky Critical Coverage`, separate from Must-Run and the scored tiers
+- **Does not affect retire decisions** — a test that meets flaky-critical criteria is NOT a retire candidate (unique coverage prevents retirement)
+
+### Pipeline Position
+
+Flaky-critical classification runs after the retire check and before final tier assignment:
+
+```
+6. Identify retire candidates
+6a. Identify flaky-critical tests (post-retire, pre-tier)
+7. Apply overrides (mandatory tag, NFR elevation)
+8. Assign initial tiers  (flaky-critical tests placed in flaky_critical list, not scored tiers)
+```
+
+---
+
 ## Decision Pipeline (execution order)
 
 ```
-1. Load and validate input
-2. Resolve dependency stories (1-hop)
-3. Classify context (5 dimensions)
-4. Compute unique coverage map (global)
-5. Score every test (raw_score formula)
-6. Identify retire candidates
-7. Apply overrides (mandatory tag, NFR elevation)
-8. Assign initial tiers
-9. Apply budget constraint (demote lowest-scored must-run)
+1.  Load and validate input
+2.  Resolve dependency stories (1-hop)
+3.  Classify context (5 dimensions)
+4.  Compute unique coverage map (global)
+5.  Score every test (raw_score formula)
+6.  Identify retire candidates
+6a. Identify flaky-critical tests (post-retire, pre-tier)
+7.  Apply overrides (mandatory tag, NFR elevation)
+8.  Assign initial tiers  (flaky-critical tests placed in flaky_critical list)
+9.  Apply budget constraint (demote lowest-scored must-run; flaky-critical exempt)
 10. Render report
 11. Validate output contract
 ```

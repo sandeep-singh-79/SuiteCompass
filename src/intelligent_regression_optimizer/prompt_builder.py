@@ -17,7 +17,7 @@ def _select_scenario(classifications: dict[str, Any], tier_result: TierResult) -
     return "balanced"
 
 
-def _format_tier_assignments(tier_result: TierResult) -> str:
+def _format_tier_assignments(tier_result: TierResult, rerun_max: int = 2) -> str:
     lines = []
     for test in tier_result.must_run:
         override = f" [override: {test.override_reason}]" if test.is_override and test.override_reason else ""
@@ -30,6 +30,14 @@ def _format_tier_assignments(tier_result: TierResult) -> str:
         lines.append(f"  DEFER: {test.test_id} {test.name} (score: {test.raw_score:.1f}){override}")
     for test in tier_result.retire:
         lines.append(f"  RETIRE: {test.test_id} {test.name} (flakiness: {test.flakiness_rate:.2f})")
+    for test in tier_result.flaky_critical:
+        reason = f", {test.flaky_critical_reason}" if test.flaky_critical_reason else ""
+        lines.append(
+            f"  FLAKY-CRITICAL: {test.test_id} {test.name}"
+            f" (flakiness: {test.flakiness_rate:.2f}{reason})"
+        )
+    if tier_result.flaky_critical:
+        lines.append(f"  FLAKY-CRITICAL RERUN MAX: {rerun_max}")
     return "\n".join(lines) if lines else "  (no tests)"
 
 
@@ -84,7 +92,7 @@ def build_prompt(
             for area in s.get("changed_areas", [])
         }),
         stories_summary=_format_stories(normalized),
-        tier_assignments=_format_tier_assignments(tier_result),
+        tier_assignments=_format_tier_assignments(tier_result, rerun_max=constraints.get("flaky_critical_rerun_max", 2)),
         total_tests=len(normalized.get("test_suite", [])),
         flakiness_high_count=_flakiness_high_count(normalized),
         must_run_exec_mins=f"{_must_run_exec_mins(tier_result, normalized):.0f}",

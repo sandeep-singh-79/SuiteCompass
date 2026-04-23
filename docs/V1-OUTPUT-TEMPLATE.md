@@ -1,6 +1,6 @@
 # V1 Output Template
 
-Annotated reference for the SuiteCompass optimisation report. The output is a structured markdown document with 6 required sections and 7 machine-checkable labels.
+Annotated reference for the SuiteCompass optimisation report. The output is a structured markdown document with 7 required sections and 8 machine-checkable labels.
 
 ---
 
@@ -14,7 +14,7 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 
 ---
 
-## Required Sections (6)
+## Required Sections (7)
 
 | # | Heading | Purpose |
 |---|---|---|
@@ -23,11 +23,12 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 | 3 | `## Should-Run If Time Permits` | Tests to run if budget allows |
 | 4 | `## Defer To Overnight Run` | Tests safe to defer to off-hours CI |
 | 5 | `## Retire Candidates` | Tests recommended for removal from the suite |
-| 6 | `## Suite Health Summary` | Aggregate health metrics for the test suite |
+| 6 | `## Flaky Critical Coverage` | Flaky tests with unique coverage that must still run |
+| 7 | `## Suite Health Summary` | Aggregate health metrics for the test suite |
 
 ---
 
-## Required Labels (7)
+## Required Labels (8)
 
 | Label | Section | Value Type | Description |
 |---|---|---|---|
@@ -37,6 +38,7 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 | `Total Retire Candidates:` | Optimisation Summary | integer | Count of retire candidate tests |
 | `NFR Elevation:` | Optimisation Summary | `Yes` / `No` | Whether performance/security tests were auto-promoted |
 | `Budget Overflow:` | Optimisation Summary | `Yes` / `No` | Whether time budget forced demotion of must-run tests |
+| `Total Flaky Critical:` | Optimisation Summary | integer | Count of tests in the flaky-critical list |
 | `Flakiness Tier High:` | Suite Health Summary | `N tests above threshold` | Count of tests above `flakiness_high_tier_threshold` |
 
 ---
@@ -54,6 +56,7 @@ Total Must-Run: 3
 Total Retire Candidates: 0
 NFR Elevation: Yes
 Budget Overflow: No
+Total Flaky Critical: 1
 
 ## Must-Run
 
@@ -73,9 +76,16 @@ _No tests in this tier._
 
 _No retire candidates._
 
+## Flaky Critical Coverage
+
+> These tests are flaky but cover sprint story areas that no other test reaches.
+> They must execute despite their flakiness. Rerun up to 2 times before treating a failure as confirmed.
+
+- AUTH-005 session token e2e (flakiness: 0.45) [stabilize or replace] unique:[SessionStore]
+
 ## Suite Health Summary
 
-Flakiness Tier High: 0 tests above threshold
+Flakiness Tier High: 1 tests above threshold
 Total automated execution time (must-run): 4 min
 Time budget: 20 min
 ```
@@ -154,8 +164,8 @@ Overrides take priority — a test with an override is always must-run even if i
 
 The output validator (`output_validator.py`) checks:
 
-1. All 6 headings present, line-anchored (`line.rstrip() == heading`)
-2. All 7 labels present exactly once
+1. All 7 headings present, line-anchored (`line.rstrip() == heading`)
+2. All 8 labels present exactly once
 3. No label duplicated
 4. Each label appears in its declared section (not globally)
 

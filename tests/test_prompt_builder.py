@@ -195,3 +195,44 @@ def test_history_source_defaults_to_input_yaml_when_absent():
     normalized = _base_normalized()  # no _meta key
     _, usr_p = build_prompt(normalized, _base_classifications(), _make_tier_result())
     assert "input" in usr_p.lower() or "yaml" in usr_p.lower()
+
+
+# ---------------------------------------------------------------------------
+# F5 — Flaky-critical tests in LLM tier assignments context
+# ---------------------------------------------------------------------------
+
+from intelligent_regression_optimizer.prompt_builder import _format_tier_assignments  # noqa: E402
+
+
+def _make_flaky_critical_test(test_id: str = "FC-01") -> ScoredTest:
+    return ScoredTest(
+        test_id=test_id, name="flaky auth test", raw_score=0.0, tier="flaky-critical",
+        is_override=False, override_reason=None, is_manual=False,
+        flakiness_rate=0.45, is_flaky_critical=True,
+        flaky_critical_reason="unique:[AuthService]",
+    )
+
+
+def test_flaky_critical_test_id_in_tier_assignments():
+    """_format_tier_assignments must include FLAKY-CRITICAL label and test id."""
+    tier = _make_tier_result(flaky_critical=[_make_flaky_critical_test("FC-01")])
+    output = _format_tier_assignments(tier)
+    assert "FLAKY-CRITICAL" in output
+    assert "FC-01" in output
+
+
+def test_prompt_user_contains_flaky_critical_label():
+    """build_prompt user_prompt must include FLAKY-CRITICAL when tier has flaky-critical tests."""
+    tier = _make_tier_result(flaky_critical=[_make_flaky_critical_test("FC-01")])
+    _, usr_p = build_prompt(_base_normalized(), _base_classifications(), tier)
+    assert "FLAKY-CRITICAL" in usr_p
+
+
+def test_prompt_user_contains_flaky_critical_rerun_max():
+    """build_prompt must include rerun-max value from constraints in the user prompt."""
+    normalized = _base_normalized()
+    normalized["constraints"]["flaky_critical_rerun_max"] = 4
+    tier = _make_tier_result(flaky_critical=[_make_flaky_critical_test("FC-01")])
+    _, usr_p = build_prompt(normalized, _base_classifications(), tier)
+    assert "rerun" in usr_p.lower()
+    assert "4" in usr_p

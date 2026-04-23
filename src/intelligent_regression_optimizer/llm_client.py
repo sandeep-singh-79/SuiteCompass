@@ -13,7 +13,7 @@ from intelligent_regression_optimizer.models import (
 
 # ---------------------------------------------------------------------------
 # A minimal but fully contract-compliant report used by FakeLLMClient.
-# All 6 headings and all 7 labels present, Recommendation Mode set to "llm".
+# All 7 headings and all 8 labels present, Recommendation Mode set to "llm".
 # ---------------------------------------------------------------------------
 _FAKE_RESPONSE = """\
 ## Optimisation Summary
@@ -21,6 +21,7 @@ _FAKE_RESPONSE = """\
 Recommendation Mode: llm
 Sprint Risk Level: medium
 Total Must-Run: 1
+Total Flaky Critical: 0
 Total Retire Candidates: 0
 NFR Elevation: No
 Budget Overflow: No
@@ -37,6 +38,10 @@ affect every downstream consumer. Its coverage of the primary data flow makes
 it the single highest-priority item in the current run budget.
 
 - T-01 Sample test (score: 9.0)
+
+## Flaky Critical Coverage
+
+_No flaky-critical tests._
 
 ## Should-Run If Time Permits
 

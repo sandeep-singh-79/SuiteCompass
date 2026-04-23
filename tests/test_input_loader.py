@@ -421,6 +421,30 @@ class TestCollectionTypeValidation:
         with pytest.raises(InputValidationError, match="mandatory_tags must be a list"):
             load_input(str(p))
 
+    def test_constraints_as_list_raises(self):
+        p = _write_tmp("constraints_list.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite: []
+            constraints: []
+        """)
+        with pytest.raises(InputValidationError, match="constraints must be a mapping"):
+            load_input(str(p))
+
+    def test_constraints_as_string_raises(self):
+        p = _write_tmp("constraints_str.yaml", """\
+            sprint_context:
+              sprint_id: S1
+              stories: []
+              exploratory_sessions: []
+            test_suite: []
+            constraints: not_a_mapping
+        """)
+        with pytest.raises(InputValidationError, match="constraints must be a mapping"):
+            load_input(str(p))
+
     def test_dependency_stories_as_string_raises(self):
         p = _write_tmp("dep_stories_str.yaml", """\
             sprint_context:
@@ -527,3 +551,66 @@ class TestDuplicateTestId:
         """)
         pkg = load_input(str(p))
         assert len(pkg.normalized["test_suite"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# F1.3 — constraints.flaky_critical_rerun_max
+# ---------------------------------------------------------------------------
+
+_MINIMAL_YAML = """\
+    sprint_context:
+      sprint_id: S1
+      stories: []
+      exploratory_sessions: []
+    test_suite: []
+    constraints:
+      time_budget_mins: 30
+      mandatory_tags: []
+      flakiness_retire_threshold: 0.3
+      flakiness_high_tier_threshold: 0.2
+"""
+
+
+class TestFlakyCriticalRerunMax:
+    """constraints.flaky_critical_rerun_max is optional int 1–5, default 2."""
+
+    def test_default_rerun_max_is_2_when_absent(self):
+        p = _write_tmp("rerun_default.yaml", _MINIMAL_YAML)
+        pkg = load_input(str(p))
+        assert pkg.normalized["constraints"]["flaky_critical_rerun_max"] == 2
+
+    def test_explicit_valid_value_accepted(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 3\n"
+        p = _write_tmp("rerun_valid.yaml", yaml)
+        pkg = load_input(str(p))
+        assert pkg.normalized["constraints"]["flaky_critical_rerun_max"] == 3
+
+    def test_boundary_value_1_accepted(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 1\n"
+        p = _write_tmp("rerun_min.yaml", yaml)
+        pkg = load_input(str(p))
+        assert pkg.normalized["constraints"]["flaky_critical_rerun_max"] == 1
+
+    def test_boundary_value_5_accepted(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 5\n"
+        p = _write_tmp("rerun_max.yaml", yaml)
+        pkg = load_input(str(p))
+        assert pkg.normalized["constraints"]["flaky_critical_rerun_max"] == 5
+
+    def test_value_0_raises(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 0\n"
+        p = _write_tmp("rerun_zero.yaml", yaml)
+        with pytest.raises(InputValidationError, match="flaky_critical_rerun_max must be between 1 and 5"):
+            load_input(str(p))
+
+    def test_value_6_raises(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 6\n"
+        p = _write_tmp("rerun_six.yaml", yaml)
+        with pytest.raises(InputValidationError, match="flaky_critical_rerun_max must be between 1 and 5"):
+            load_input(str(p))
+
+    def test_non_integer_raises(self):
+        yaml = _MINIMAL_YAML + "      flaky_critical_rerun_max: 2.5\n"
+        p = _write_tmp("rerun_float.yaml", yaml)
+        with pytest.raises(InputValidationError, match="flaky_critical_rerun_max must be an integer"):
+            load_input(str(p))

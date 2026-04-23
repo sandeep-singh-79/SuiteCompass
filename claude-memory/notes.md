@@ -8,7 +8,24 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ---
 
 ## Open Questions
-- None at session start.
+- None.
+
+## Review Findings (2026-04-23)
+- Current branch re-review against `master` found one concrete runtime defect in `input_loader.py`: `validate_raw()` does not verify that `constraints` is a mapping before calling `.get(...)`. Payloads like `constraints: []` raise `AttributeError` instead of `InputValidationError`.
+- Repo authority drift remains in `plan.md` Session Details: current focus still reports the older 562-test pre-seal state and a future `Last Updated` date, while the branch state and repo memory now reflect 602 passing tests and post-remediation status.
+- No additional deterministic scoring, renderer, prompt, benchmark, or flaky-critical contract defects were found in the current branch review.
+
+## Flaky-Critical Increment Reconciliation (2026-04-23)
+- The flaky-critical implementation plan existed in `/memories/session/plan.md` during execution but had not been copied into repo `plan.md`.
+- Repo `plan.md` now includes:
+	- a short completion summary
+	- the archived F1-F5 implementation plan
+	- a plan-vs-implementation drift section
+- Key drift captured:
+	- CLI integration was planned but not shipped
+	- broad doc updates were planned but not shipped in the feature slice
+	- `llm_flow.py` prompt-context updates were planned but not shipped
+	- fallback/repair fixtures were updated so the new output contract remained green
 
 ## Pre-Seal Review Findings (2026-04-22) — RESOLVED
 - Scope reviewed: V1-C implementation and recent hardening changes, judged against plan.md as authority.

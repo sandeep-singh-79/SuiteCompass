@@ -466,3 +466,86 @@ class TestHistoryFlags:
         assert "#" in result.output
 
 
+# ---------------------------------------------------------------------------
+# F3.3 — Flaky-critical path through the CLI
+# ---------------------------------------------------------------------------
+
+class TestFlakyCriticalCLI:
+    """CLI-level tests for the flaky-critical report section."""
+
+    def test_flaky_critical_appears_in_cli_output(self):
+        """iro run on the flaky-critical benchmark emits the dedicated section."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", str(BENCHMARKS / "flaky-critical-sprint.input.yaml")])
+        assert result.exit_code == 0, result.output
+        assert "## Flaky Critical Coverage" in result.output
+        assert "Total Flaky Critical: 1" in result.output
+
+    def test_flaky_critical_via_history_overlay(self, tmp_path):
+        """When JUnit history pushes a test's flakiness above the threshold, and it has
+        unique coverage over a high-risk story's changed areas, it must appear in the
+        Flaky Critical Coverage section even though the YAML flakiness is below threshold.
+        """
+        import xml.etree.ElementTree as ET
+        import yaml
+
+        # Input: one test, YAML flakiness=0.01 (below threshold), but unique coverage
+        # over a high-risk story's changed_areas. No other test covers "UniqueServiceX".
+        data = {
+            "sprint_context": {
+                "stories": [{
+                    "id": "S-1", "risk": "high",
+                    "changed_areas": ["UniqueServiceX"],
+                    "dependency_stories": [],
+                }],
+                "exploratory_sessions": [],
+            },
+            "test_suite": [{
+                "id": "TC::flaky_auth",
+                "name": "flaky auth test",
+                "layer": "integration",
+                "coverage_areas": ["UniqueServiceX"],
+                "execution_time_secs": 30,
+                "flakiness_rate": 0.01,   # low in YAML; history will override
+                "automated": True,
+                "tags": [],
+            }],
+            "constraints": {
+                "flakiness_retire_threshold": 0.30,
+                "flakiness_high_tier_threshold": 0.20,
+                "time_budget_mins": 60,
+            },
+        }
+        input_p = tmp_path / "input.yaml"
+        input_p.write_text(yaml.safe_dump(data))
+
+        # JUnit history: 5 failures out of 10 runs → flakiness 0.5 (above 0.20 threshold)
+        xml_dir = tmp_path / "xml"
+        xml_dir.mkdir()
+        classname, testname = "TC", "flaky_auth"
+        for i in range(5):   # 5 passing runs
+            suite = ET.Element("testsuite")
+            suite.set("name", "S")
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", testname)
+            tc.set("classname", classname)
+            (xml_dir / f"run-{i:03d}.xml").write_text(ET.tostring(suite, encoding="unicode"))
+        for i in range(5, 10):  # 5 failing runs
+            suite = ET.Element("testsuite")
+            suite.set("name", "S")
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", testname)
+            tc.set("classname", classname)
+            fl = ET.SubElement(tc, "failure")
+            fl.set("message", "AssertionError")
+            (xml_dir / f"run-{i:03d}.xml").write_text(ET.tostring(suite, encoding="unicode"))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["run", str(input_p), "--history-dir", str(xml_dir)],
+        )
+        assert result.exit_code == 0, result.output
+        assert "## Flaky Critical Coverage" in result.output
+
+

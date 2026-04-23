@@ -9,7 +9,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 ## Key Capabilities
 
 - **Deterministic scoring** — formula-based, reproducible prioritisation with no LLM dependency
-- **Tiered recommendations** — must-run / should-run / defer / retire with override support
+- **Tiered recommendations** — must-run / should-run / defer / retire / flaky-critical with override support
 - **NFR elevation** — automatic promotion of performance and security tests in high-risk sprints
 - **Budget-aware** — respects time budgets with overflow demotion logic
 - **LLM narrative** — optional prose explanations via Ollama, OpenAI, or Gemini; deterministic fallback guaranteed
@@ -21,7 +21,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 | Path | Purpose |
 |---|---|
 | `src/intelligent_regression_optimizer/` | Core package — loader, classifier, scorer, renderer, validator, CLI |
-| `tests/` | 562 pytest tests (96.47% coverage) |
+| `tests/` | 601 pytest tests |
 | `benchmarks/` | Benchmark input YAMLs + assertion files + sample Excel |
 | `templates/` | Excel import template (13 columns) |
 | `docs/` | Full documentation (see index below) |
@@ -86,8 +86,8 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | V1-A (CI history overlay) | Complete |
 | V1-B (git diff area mapper) | Complete |
 | V1-C (LLM narrative layer) | Complete |
-| Tests | 562 |
-| Coverage | 96.47% |
+| V1-D (Flaky-Critical Elevation) | Complete |
+| Tests | 601 |
 | Python | ≥ 3.13 |
 
 ## License

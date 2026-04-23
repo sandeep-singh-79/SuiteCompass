@@ -23,6 +23,9 @@ TIER_SHOULD_RUN = 4.0
 
 NFR_LAYERS = {"performance", "security"}
 
+# Risks that qualify a story for flaky-critical elevation
+_FLAKY_CRITICAL_RISKS = {"high", "medium"}
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -76,11 +79,17 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
     # --- 3. Identify retire candidates -------------------------------------
     retire_ids: set[str] = _find_retire_candidates(tests, retire_threshold, unique_coverage)
 
+    # --- 3b. Identify flaky-critical tests ---------------------------------
+    flaky_critical_ids: set[str] = _find_flaky_critical(
+        tests, stories, retire_ids, unique_coverage, constraints
+    )
+
     # --- 4. Assign initial tiers -------------------------------------------
     must_run: list[ScoredTest] = []
     should_run: list[ScoredTest] = []
     defer: list[ScoredTest] = []
     retire: list[ScoredTest] = []
+    flaky_critical: list[ScoredTest] = []
 
     for st in scored:
         test = next(t for t in tests if t["id"] == st.test_id)
@@ -93,6 +102,13 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
         if st.is_override:
             st.tier = "must-run"
             must_run.append(st)
+            continue
+
+        if st.test_id in flaky_critical_ids:
+            st.tier = "flaky-critical"
+            st.is_flaky_critical = True
+            st.flaky_critical_reason = _build_flaky_critical_reason(test, unique_coverage)
+            flaky_critical.append(st)
             continue
 
         if st.raw_score >= TIER_MUST_RUN:
@@ -128,6 +144,7 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
         defer=defer,
         retire=retire,
         budget_overflow=budget_overflow,
+        flaky_critical=flaky_critical,
     )
 
 
@@ -226,6 +243,55 @@ def _find_retire_candidates(
             continue  # has unique coverage — do not retire
         retire_ids.add(test["id"])
     return retire_ids
+
+
+def _find_flaky_critical(
+    tests: list[dict],
+    stories: list[dict],
+    retire_ids: set[str],
+    unique_coverage: set[str],
+    constraints: dict,
+) -> set[str]:
+    """Return ids of tests that qualify as flaky-critical.
+
+    A test qualifies iff ALL of the following are true:
+    1. flakiness_rate > flakiness_high_tier_threshold
+    2. direct coverage overlap with at least one sprint story's changed_areas
+    3. that story has risk: medium or high
+    4. test has unique coverage (at least one coverage_area in unique_coverage)
+
+    Tests already in retire_ids are excluded — retire takes precedence.
+    """
+    threshold: float = constraints.get("flakiness_high_tier_threshold", 0.20)
+    flaky_critical_ids: set[str] = set()
+
+    for test in tests:
+        if test["id"] in retire_ids:
+            continue
+        if not test.get("automated", True):
+            continue
+        flakiness = test.get("flakiness_rate", 0.0)
+        if flakiness <= threshold:
+            continue
+        coverage_areas: set[str] = set(test.get("coverage_areas", []))
+        if not (coverage_areas & unique_coverage):
+            continue
+        # Check for direct coverage overlap with a medium/high risk story
+        for story in stories:
+            if story.get("risk") not in _FLAKY_CRITICAL_RISKS:
+                continue
+            if coverage_areas & set(story.get("changed_areas", [])):
+                flaky_critical_ids.add(test["id"])
+                break
+
+    return flaky_critical_ids
+
+
+def _build_flaky_critical_reason(test: dict, unique_coverage: set[str]) -> str:
+    """Build a human-readable reason string for a flaky-critical test."""
+    test_areas: set[str] = set(test.get("coverage_areas", []))
+    unique_areas = sorted(test_areas & unique_coverage)
+    return f"unique:{unique_areas}"
 
 
 def _apply_budget_constraint(
