@@ -198,6 +198,64 @@ Exploratory testing has identified specific risk areas that the test suite shoul
 
 - Stories with `risk: medium` changing broad areas
 - 1-2 exploratory sessions with `risk_areas` targeting specific subsystems
+
+---
+
+## Flaky-Critical Coverage Sprint
+
+### Context
+
+A sprint where some tests are both flaky and the *only* tests covering certain story areas. The scoring formula penalises their flakiness, but retiring them would leave those areas unverified. SuiteCompass resolves this tension via the **flaky-critical classification**: these tests must run, but the report also signals they need investment.
+
+### Key Input Properties
+
+- At least one story with `risk: medium` or `risk: high`
+- One test (`FC-001`) with `flakiness_rate > flakiness_high_tier_threshold` (0.20), covering a story-changed area (`SessionStore`) that no other test covers — **unique coverage present**
+- One test (`FC-002`) with high flakiness but **no unique coverage** (another test also covers its area) — retire candidate, not flaky-critical
+- One stable test (`T-003`) that covers the changed story area normally
+
+### Expected Behaviour
+
+- **Total Flaky Critical:** `1` (only `FC-001` qualifies — `FC-002` retires, `T-003` is stable)
+- **`## Flaky Critical Coverage`** section appears in the report with `FC-001`
+- `FC-001` receives a `stabilize or replace` action
+- `FC-002` appears in **Retire Candidates** (flaky + no unique coverage)
+- `T-003` is scored normally and lands in Must-Run (direct coverage, high risk)
+
+### Why FC-002 Does Not Qualify
+
+`FC-002` covers `AuthService`, but so does `T-003`. Because `FC-002` has no unique coverage, it meets all three retire conditions (automated + flaky + no unique coverage) and is retired. It is never a flaky-critical candidate.
+
+### Tradeoffs
+
+Flaky-critical is a short-term execution directive, not a long-term solution. The `stabilize or replace` action is a prompt for the team to invest: either fix the root cause of the flakiness, or write a stable replacement test before retiring the flaky one. Leaving flaky-critical tests in the suite indefinitely is an anti-pattern.
+
+### Try It
+
+A runnable benchmark is provided for this scenario:
+
+```bash
+iro benchmark benchmarks/flaky-critical-sprint.input.yaml \
+              benchmarks/flaky-critical-sprint.assertions.yaml
+# Expected: OK — N checks passed.
+```
+
+### Expected Output
+
+```
+Sprint Risk Level:    high
+NFR Elevation:        No
+Budget Overflow:      No
+Total Must-Run:       1  (T-003)
+Total Flaky Critical: 1  (FC-001)
+Total Retire Candidates: 1  (FC-002)
+```
+
+Key signals to observe:
+- `## Flaky Critical Coverage` section is present
+- `FC-001` appears in the flaky-critical section with a `stabilize or replace` action
+- `FC-002` appears in Retire Candidates — not in flaky-critical — because it has no unique coverage
+- `T-003` appears in Must-Run with a normal score
 - Tests covering those risk_areas get +3 exploratory bonus
 - Without the bonus, these tests might only reach should-run; with it, they reach must-run
 

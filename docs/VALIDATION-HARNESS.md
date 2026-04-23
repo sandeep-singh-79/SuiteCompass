@@ -40,8 +40,8 @@ Performed by `input_loader.py` during every `iro run` invocation.
 Performed by `output_validator.py` after report rendering. Runs automatically inside `iro run`.
 
 **Checks:**
-- All 6 required headings present (line-anchored)
-- All 7 required labels present exactly once
+- All 7 required headings present (line-anchored)
+- All 8 required labels present exactly once
 - No label duplicated
 - Each label in its declared section
 
@@ -217,7 +217,7 @@ Add both files to version control. The CI pipeline will run all benchmarks on ev
 
 ## Best Practices for Assertions
 
-1. **Always include all 6 headings** — catches rendering regressions
+1. **Always include all 7 headings** — catches rendering regressions
 2. **Assert specific test IDs** in expected tiers — catches scoring regressions
 3. **Assert label values** (e.g. `Sprint Risk Level: high`) not just label presence
 4. **Use `must_not_include_substrings`** for negative assertions — e.g. manual tests should never appear in retire format

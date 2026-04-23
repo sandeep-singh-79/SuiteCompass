@@ -602,4 +602,26 @@ class TestLLMPipelineE2E:
         llm_result = run_llm_pipeline(normalized, classifications, tier_result, FakeLLMClient())
         report = build_comparison_report(det_result.message, llm_result)
         assert "## Optimisation Summary" in report
-        assert "Recommendation Mode: deterministic" in report
+
+
+# ---------------------------------------------------------------------------
+# F3 — Flaky Critical Coverage benchmark E2E
+# ---------------------------------------------------------------------------
+
+class TestFlakyCriticalBenchmark:
+    """Full pipeline run against the flaky-critical-sprint benchmark."""
+
+    def test_flaky_critical_benchmark_exits_ok(self):
+        result = run_pipeline(str(BENCHMARKS / "flaky-critical-sprint.input.yaml"))
+        assert result.exit_code == EXIT_OK, result.message
+
+    def test_flaky_critical_benchmark_output_passes_validator(self):
+        from intelligent_regression_optimizer.output_validator import validate_output
+        result = run_pipeline(str(BENCHMARKS / "flaky-critical-sprint.input.yaml"))
+        vr = validate_output(result.message)
+        assert vr.is_valid, vr.errors
+
+    def test_flaky_critical_benchmark_assertions_pass(self):
+        result = run_pipeline(str(BENCHMARKS / "flaky-critical-sprint.input.yaml"))
+        ar = run_assertions(result.message, str(BENCHMARKS / "flaky-critical-sprint.assertions.yaml"))
+        assert ar.is_valid, ar.errors

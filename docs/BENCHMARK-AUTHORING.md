@@ -125,6 +125,7 @@ must_include_headings:
   - "## Should-Run If Time Permits"
   - "## Defer To Overnight Run"
   - "## Retire Candidates"
+  - "## Flaky Critical Coverage"
   - "## Suite Health Summary"
 ```
 
@@ -140,6 +141,7 @@ must_include_labels:
   - "Total Retire Candidates:"
   - "NFR Elevation:"
   - "Budget Overflow:"
+  - "Total Flaky Critical:"
   - "Flakiness Tier High:"
 ```
 
@@ -179,6 +181,75 @@ must_not_include_substrings:
 - Don't assert exact scores (e.g. `"score: 9.84"`) — they change when formula constants are tuned.
 - Don't assert section membership with substring alone (e.g. asserting `TEST-001` is in must-run vs. should-run requires the test ID to appear with context — use `must_not_include_substrings` to exclude wrong placements instead).
 - Don't duplicate the standard headings/labels boilerplate in every explanation; just include them.
+
+---
+
+## Flaky-Critical Benchmark Pattern
+
+A flaky-critical benchmark exercises the post-scoring classification that fires when a test is flaky, covers a story-changed area uniquely, and would otherwise be under-prioritised by the scoring formula. The canonical example is `benchmarks/flaky-critical-sprint`.
+
+### Input design rules
+
+1. **Qualifying test (`FC-001` style):** `flakiness_rate > flakiness_high_tier_threshold` (e.g. 0.45), `coverage_areas` overlap with a story's `changed_areas`, and **no other test** in the suite covers those areas. The test must be `automated: true`.
+
+2. **Non-qualifying flaky test (`FC-002` style):** Same flakiness level, but another test covers the same area — unique coverage is absent. This test should become a retire candidate, proving the tool distinguishes the two cases.
+
+3. **Stable must-run test (`T-003` style):** Low flakiness, covers the story-changed area. Scores normally and lands in must-run. Its presence ensures the `FC-001` area has at least one stable test in the scored tiers alongside the flaky-critical one.
+
+4. **Story risk:** Use `risk: high` or `risk: medium` — the flaky-critical check only fires for medium/high-risk story coverage.
+
+### Assertions pattern
+
+```yaml
+# Standard headings (must include the 7th heading)
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Flaky Critical Coverage"   # <-- new in flaky-critical sprint
+  - "## Suite Health Summary"
+
+# Standard labels (must include the 8th label)
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Total Flaky Critical:"         # <-- new in flaky-critical sprint
+  - "Flakiness Tier High:"
+
+# Flaky-critical assertions
+must_include_substrings:
+  - "Total Flaky Critical: 1"                  # assert count
+  - "FC-001"                                    # assert qualifying test appears
+  - "stabilize or replace"                      # assert action emitted
+
+must_not_include_substrings:
+  # FC-001 must not appear as a retire candidate
+  - "FC-001 session token e2e (flakiness:"      # retire-candidate format
+  # FC-002 must be retired, not flaky-critical
+  - "Total Flaky Critical: 2"                   # only one should qualify
+```
+
+### What these assertions prove
+
+- The `## Flaky Critical Coverage` heading exists (7-heading contract)
+- The `Total Flaky Critical:` label exists (8-label contract)
+- The qualifying test appears in the flaky-critical section
+- The `stabilize or replace` directive is emitted
+- The non-qualifying flaky test is retired (not promoted to flaky-critical)
+- FC-001 does not appear in the retire candidate format
+
+### Running against the canonical benchmark
+
+```bash
+iro benchmark benchmarks/flaky-critical-sprint.input.yaml \
+              benchmarks/flaky-critical-sprint.assertions.yaml
+```
 
 ---
 

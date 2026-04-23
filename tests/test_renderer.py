@@ -24,13 +24,15 @@ def _scored(id_, name="test", score=5.0, tier="should-run", override=False,
     )
 
 
-def _tier_result(must_run=None, should_run=None, defer=None, retire=None, overflow=False):
+def _tier_result(must_run=None, should_run=None, defer=None, retire=None,
+                 overflow=False, flaky_critical=None):
     return TierResult(
         must_run=must_run or [],
         should_run=should_run or [],
         defer=defer or [],
         retire=retire or [],
         budget_overflow=overflow,
+        flaky_critical=flaky_critical or [],
     )
 
 
@@ -250,3 +252,67 @@ class TestRetireCandidateFlakiness:
         assert "(flakiness: 0.45" in output
         # Must NOT contain the raw_score masquerading as flakiness
         assert "(flakiness: 6.15" not in output
+
+
+# ---------------------------------------------------------------------------
+# F2.2 — Flaky Critical Coverage section in rendered output
+# ---------------------------------------------------------------------------
+
+def _flaky_critical_scored(id_="FC1", name="flaky auth test", flakiness=0.35,
+                            reason="unique:[auth]"):
+    return ScoredTest(
+        test_id=id_, name=name, raw_score=0.0, tier="flaky-critical",
+        is_override=False, override_reason=None, is_manual=False,
+        is_flaky_critical=True, flaky_critical_reason=reason,
+        flakiness_rate=flakiness,
+    )
+
+
+class TestFlakyCriticalSection:
+    def test_flaky_critical_heading_present(self):
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        fc = _flaky_critical_scored()
+        tier = _tier_result(flaky_critical=[fc])
+        output = render_report(normalized, classifications, tier)
+        assert "## Flaky Critical Coverage" in output
+
+    def test_total_flaky_critical_label_in_summary(self):
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        fc = _flaky_critical_scored()
+        tier = _tier_result(flaky_critical=[fc])
+        output = render_report(normalized, classifications, tier)
+        sections = parse_sections(output)
+        assert "Total Flaky Critical: 1" in sections.get("## Optimisation Summary", "")
+
+    def test_flaky_critical_test_appears_in_section(self):
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        fc = _flaky_critical_scored("FC1", "flaky auth test", flakiness=0.35, reason="unique:[auth]")
+        tier = _tier_result(flaky_critical=[fc])
+        output = render_report(normalized, classifications, tier)
+        sections = parse_sections(output)
+        section_text = sections.get("## Flaky Critical Coverage", "")
+        assert "FC1" in section_text
+        assert "flaky auth test" in section_text
+
+    def test_flaky_critical_section_includes_stabilize_action(self):
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        fc = _flaky_critical_scored()
+        tier = _tier_result(flaky_critical=[fc])
+        output = render_report(normalized, classifications, tier)
+        assert "stabilize or replace" in output
+
+    def test_output_validates_with_flaky_critical(self):
+        normalized = _base_normalized()
+        classifications = _base_classifications()
+        fc = _flaky_critical_scored()
+        tier = _tier_result(
+            must_run=[_scored("T1", score=10.0, tier="must-run")],
+            flaky_critical=[fc],
+        )
+        output = render_report(normalized, classifications, tier)
+        result = validate_output(output)
+        assert result.is_valid, result.errors

@@ -177,6 +177,41 @@ This value is **not used in scoring, tiering, or any report output**. It is an i
 
 ---
 
+## Post-Scoring Classification — Flaky-Critical
+
+Flaky-critical is a **post-scoring classification**, not a scored tier. It fires after `raw_score` is computed and after retire candidates are identified, but before final tier assignment.
+
+### Why it cannot be derived from raw_score
+
+A flaky-critical test's score may land anywhere in the scoring range. A test can be flaky-critical with a score of 1.5 (defer range) if:
+- it has direct coverage of a high-risk story (raw contribution: 10.0)
+- but its flakiness rate is 0.9 (penalty: −7.2)
+- yielding raw_score = 2.8 → normally Defer
+
+The scoring formula deliberately penalises flakiness. If the classification relied on `raw_score ≥ threshold`, this test would be deferred and its unique coverage silently lost. The post-scoring check bypasses the score and applies independent criteria.
+
+### Classification logic (pseudocode)
+
+```
+for each test not already in retire_candidates:
+    if (
+        test.automated == True
+        AND test.flakiness_rate > constraints.flakiness_high_tier_threshold
+        AND test.coverage_areas ∩ any_story.changed_areas ≠ ∅  (story.risk in {medium, high})
+        AND test has unique coverage
+    ):
+        → flaky_critical list (not placed in scored tiers)
+```
+
+### Interaction with other rules
+
+- Flaky-critical tests are **never** retire candidates (unique coverage prevents retirement)
+- Flaky-critical tests are **budget-exempt** (same exemption as overrides)
+- Manual tests (`automated: false`) are **excluded** from flaky-critical consideration
+- A flaky-critical test is removed from the scored-tier lists — it appears only in the `## Flaky Critical Coverage` section
+
+---
+
 ## Worked Examples
 
 ### Example A — High-risk direct coverage, clean test

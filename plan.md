@@ -1,8 +1,85 @@
 # Session Plan
 
 > **Purpose:** Track the active planning and execution steps for the `intelligent-regression-optimizer` repository.
-> **Scope:** Session-specific or cycle-specific. Refresh as milestones move.
-> **Last Updated:** 2026-04-25
+> **Scope:** Session-specific or cycle-specific. Refresh as milestones update.
+> **Last Updated:** 2026-04-23
+
+---
+
+## Active Increment — Flaky-Critical Drift Remediation
+
+Three items from the flaky-critical feature plan were not shipped and have been addressed. All work stayed on `feature/flaky-critical-elevation`. Execution order: F5 → F3.3 → F4 → post-review remediation (R1, R2, R3).
+
+### Phase F5 — LLM Prompt Context
+
+**Problem:** `_format_tier_assignments()` in `prompt_builder.py` iterates `must_run`, `should_run`, `defer`, `retire` but skips `flaky_critical`. The LLM cannot write a meaningful narrative for the flaky-critical section because it never sees those tests.
+
+**Files:** `src/intelligent_regression_optimizer/prompt_builder.py`, `tests/test_prompt_builder.py`
+
+**Steps:**
+1. RED — append 2 tests to `tests/test_prompt_builder.py`:
+   - `test_flaky_critical_test_id_in_tier_assignments` — build a `TierResult` with one flaky-critical test, call `_format_tier_assignments()` directly, assert `"FLAKY-CRITICAL"` and the test id appear
+   - `test_prompt_user_contains_flaky_critical_label` — call `build_prompt()` with a flaky-critical tier, assert `"FLAKY-CRITICAL"` is in the returned user_prompt string
+2. GREEN — in `_format_tier_assignments()`, after the `retire` loop, add a `flaky_critical` loop emitting `FLAKY-CRITICAL: {id} {name} (flakiness: {rate:.2f}, {reason})`
+3. No template files need to change — `{tier_assignments}` is already a variable in all 5 scenario templates
+4. Run `pytest tests/test_prompt_builder.py -v` — all pass
+5. Run full suite — 0 regressions
+6. Commit: `feat(prompt): include flaky-critical tests in LLM tier assignments context`
+
+**Completion condition:** Both new tests green; full suite passes.
+
+### Phase F3.3 — CLI Integration Tests
+
+**Problem:** No CLI-level test exercises the flaky-critical path through `iro run`.
+
+**Files:** `tests/test_cli.py` only — no source changes needed
+
+**Steps:**
+1. Append class `TestFlakyCriticalCLI` to `tests/test_cli.py`:
+   - `test_flaky_critical_appears_in_cli_output` — invoke `iro run benchmarks/flaky-critical-sprint.input.yaml` via `CliRunner`; assert `## Flaky Critical Coverage` and `Total Flaky Critical: 1` in stdout; assert exit 0. Reuse the existing `BENCHMARKS` constant.
+   - `test_flaky_critical_via_history_overlay` — write a minimal YAML with one test (`flakiness_rate=0.01`, unique coverage area, `risk: high` story); write 5/10 JUnit XML runs as failures (computed flakiness 0.5 > threshold 0.20); invoke `iro run <yaml> --history-dir <xml_dir>`; assert `## Flaky Critical Coverage` in stdout. Use the `_write_junit_pass_fail` helper already in `TestHistoryFlags`.
+2. Run `pytest tests/test_cli.py::TestFlakyCriticalCLI -v` — both pass
+3. Run full suite — 0 regressions
+4. Commit: `feat(cli): end-to-end CLI tests for flaky-critical path and history overlay`
+
+**Completion condition:** Both new tests green; full suite passes.
+
+### Phase F4 — Documentation
+
+**Problem:** 7 doc files still describe the old 6-heading/7-label output contract and have no mention of flaky-critical.
+
+**Files (docs only — no source or test changes):**
+- `docs/DECISION-RULES.md` — add "Flaky-Critical Classification" section: 4 qualification criteria, decision table, execution rules (always-run, budget-exempt, never-gate, rerun-max, stabilize-or-replace)
+- `docs/V1-OUTPUT-TEMPLATE.md` — update heading count 6→7 and label count 7→8; add `## Flaky Critical Coverage` to required-sections list and annotated sample; add `Total Flaky Critical:` row to required-labels table
+- `docs/SCORING-FORMULA.md` — add "Post-Scoring Classification: Flaky-Critical" section; clarify this fires after scoring, cannot be derived from raw score
+- `docs/SCENARIO-LIBRARY.md` — add scenario "Flaky-Critical Coverage Sprint" using `flaky-critical-sprint` benchmark; explain why FC-001 qualifies and FC-002 retires
+- `docs/LEARNING-GUIDE.md` — add section "Interpreting the Flaky Critical Coverage Section": meaning, unique coverage gate, rerun policy, stabilize-or-replace, contrast with retire
+- `docs/BENCHMARK-AUTHORING.md` — add "Flaky-Critical Benchmark Pattern" subsection; reference `flaky-critical-sprint` as canonical example
+- `README.md` — update output contract table (6→7 sections, 7→8 labels); update development status
+
+**Steps:**
+1. Update all 7 files in a single pass
+2. Run full suite — 0 regressions (docs only; no test changes expected)
+3. Commit: `docs: flaky-critical decision rules, output template, scoring, scenarios, learning guide, benchmark authoring, README`
+
+**Completion condition:** All 7 files updated; full suite still passes.
+
+### Squash Strategy Before PR (final 5 commits)
+
+| # | Commit message | Contains |
+|---|---|---|
+| 1 | `feat: add flaky-critical model fields` | `7a63c81` as-is |
+| 2 | `feat: flaky-critical detection, scoring engine routing, input config` | `129022d` as-is |
+| 3 | `feat: flaky-critical output contract, renderer, CLI integration` | `e148eac` + new F3.3 squashed in |
+| 4 | `feat: e2e pipeline, benchmark, LLM prompt context` | `44fba57` + `d9ed58a` + new F5 squashed in |
+| 5 | `docs: flaky-critical full documentation pass` | new F4 commit |
+
+### Verification
+
+1. `pytest tests/test_prompt_builder.py -v` — all pass (after F5)
+2. `pytest tests/test_cli.py::TestFlakyCriticalCLI -v` — both pass (after F3.3)
+3. `pytest tests/ -k "not live" -q` — 599+ passing, 0 failures
+4. `iro benchmark benchmarks/flaky-critical-sprint.input.yaml benchmarks/flaky-critical-sprint.assertions.yaml` — `OK`
 
 ---
 
@@ -13,8 +90,130 @@
 | Capability | intelligent-regression-optimizer |
 | Objective | MVP SEALED |
 | Current Phase | All phases (V1-A + V1-B + V1-C) complete |
-| Current Focus | Pre-seal review remediation complete. Provider-exception fallback, summary-only mode, prompt context enrichment, benchmark narrative assertions, vacuous-test cleanup, and doc reconciliation are all green. Full regression passed: 562 tests, 96.47% coverage. Next: merge/tag or run final acceptance review before release. |
-| Last Updated | 2026-04-25 |
+| Current Focus | Flaky-critical elevation complete. All review findings remediated. 604+ tests passing. Branch ready for PR preparation. |
+| Last Updated | 2026-04-23 |
+
+---
+
+## Increment Record - Flaky Critical Elevation (2026-04-23)
+
+> **Status:** Complete.
+> **Scope:** Cross-cutting deterministic enhancement to protect unique, sprint-critical coverage from being demoted or retired solely because the covering test is flaky.
+> **Validation:** Full regression green at 604+ tests, 0 failures.
+
+### Completion Summary
+
+| Field | Value |
+|---|---|
+| Branch | `feature/flaky-critical-elevation` |
+| Commits | `7a63c81`, `129022d`, `e148eac`, `44fba57`, `d9ed58a` |
+| Core outcome | Added a budget-exempt `flaky-critical` classification and dedicated report section |
+| Output contract change | 7 headings, 8 required labels |
+| New benchmark | `benchmarks/flaky-critical-sprint.*` |
+| Net validation result | 604 passed, 0 failed |
+
+### Problem
+
+The scoring engine previously treated flakiness only as a penalty. A flaky test covering a high-risk sprint area with unique coverage could be demoted or retired, leaving no reliable signal for a truly important regression surface. Teams then either missed regressions or manually overrode the tool.
+
+### Locked Design Decision
+
+Introduce **flaky-critical** as a cross-cutting classification, not as a new scored tier between must-run and should-run.
+
+A test qualifies as flaky-critical only when all of the following are true:
+
+1. `flakiness_rate > flakiness_high_tier_threshold` (default 0.20)
+2. Direct coverage overlap with at least one sprint story's `changed_areas`
+3. The matched story has `risk: medium` or `risk: high`
+4. The test has unique coverage (at least one coverage area no other test covers)
+
+Behavior rules:
+
+1. Always execute flaky-critical tests
+2. Do not treat a single flaky-critical failure as a clean release gate
+3. Keep them budget-exempt like hard overrides
+4. Render them in a dedicated `## Flaky Critical Coverage` section
+5. Recommend reruns via `constraints.flaky_critical_rerun_max` (default 2)
+6. Require a prescriptive remediation action: `stabilize or replace`
+
+### Archived Implementation Plan
+
+#### Phase F1 - Model and Scoring Engine
+
+**F1.1 - Model changes**
+- Add `is_flaky_critical: bool = False` and `flaky_critical_reason: str | None = None` to `ScoredTest`
+- Add `flaky_critical: list[ScoredTest]` to `TierResult`
+- Red-first model tests for defaults and field presence
+
+**F1.2 - Scoring engine routing**
+- Add `_find_flaky_critical()` and `_build_flaky_critical_reason()`
+- Route qualifying tests out of normal must-run/should-run/defer tiering
+- Keep retire precedence for flaky tests with no unique coverage
+- Keep flaky-critical tests budget-exempt
+- Validate decision-table behavior with scoring tests
+
+**F1.3 - Input contract**
+- Accept optional `constraints.flaky_critical_rerun_max`
+- Validate `int` type and range `1..5`
+- Default absent value to `2`
+
+#### Phase F2 - Output Contract and Renderer
+
+**F2.1 - Output validator**
+- Add `## Flaky Critical Coverage` to required headings
+- Add `Total Flaky Critical:` to summary labels
+- Preserve exact string and section-aware validation rules
+
+**F2.2 - Renderer**
+- Add `Total Flaky Critical: N` to `## Optimisation Summary`
+- Render a dedicated flaky-critical section between Must-Run and Should-Run
+- Include explanation, rerun recommendation, and `stabilize or replace` action text
+
+#### Phase F3 - Integration and Benchmarks
+
+**F3.1 - E2E flow**
+- Ensure `score_tests()` output flows unchanged through `run_pipeline()` into rendering and validation
+
+**F3.2 - Benchmark scenario**
+- Add `benchmarks/flaky-critical-sprint.input.yaml`
+- Add matching assertions proving:
+   - one flaky test with unique impacted coverage becomes flaky-critical
+   - one non-unique flaky test retires
+   - stable impacted coverage still appears in must-run
+
+#### Phase F4 - Documentation
+
+Planned scope included updates to scoring, decision-rules, output-template, learning-guide, scenario-library, benchmark-authoring, and README.
+
+#### Phase F5 - LLM Layer
+
+Planned scope included deterministic fallback text and LLM prompt/context support for flaky-critical data.
+
+### What Actually Shipped
+
+| Commit | Delivered |
+|---|---|
+| `7a63c81` | Model fields for `ScoredTest` and `TierResult` |
+| `129022d` | Scoring detection, budget-exempt routing, input config |
+| `e148eac` | Output contract expansion and renderer support |
+| `44fba57` | E2E tests and flaky-critical benchmark |
+| `d9ed58a` | LLM fallback fixture and repair fixture contract updates |
+
+### Plan-vs-Implementation Drift
+
+1. **CLI integration was planned but not shipped.** No new CLI flag or CLI-specific flaky-critical test was added.
+2. **Documentation scope was planned broadly but not shipped broadly.** The repo docs were not updated in the same slice; only plan/memory persistence is being reconciled now.
+3. **LLM prompt-context work was planned but not shipped.** `llm_flow.py` was not updated; only `FakeLLMClient` fallback output and repair fixtures were made contract-compliant.
+4. **The session plan lived only in `/memories/session/plan.md` during implementation.** It was not copied into this repo `plan.md` until this reconciliation step.
+5. **Validator contract counts changed from the older repo baseline.** The shipped feature now requires 7 headings and 8 labels, superseding the earlier 6-heading/7-label contract recorded elsewhere in this file.
+
+### Final State After Delivery
+
+1. Flaky tests with unique impacted coverage under medium/high-risk stories are surfaced as flaky-critical.
+2. Non-unique flaky tests still retire.
+3. The report contains a dedicated flaky-critical section and summary count.
+4. Full regression passed at 604 tests.
+5. Next action: strategic review of the 5 commits, then decide whether to keep 5 commits as-is or squash further before PR.
 
 ---
 
@@ -199,7 +398,7 @@ Mirrors the documentation and learning layer built for QEStrategyForge.
 - README quick-start works from a fresh clone (`iro run tests/fixtures/valid_input.yaml` exits 0)
 - USAGE-GUIDE covers all 3 CLI subcommands, all flags, all exit codes (0/1/2)
 - V1-INPUT-TEMPLATE documents every validated field from `input_loader.py`
-- V1-OUTPUT-TEMPLATE lists all 6 headings + 7 labels from `output_validator.py`
+- V1-OUTPUT-TEMPLATE lists all 7 headings + 8 labels from `output_validator.py`
 - DECISION-RULES scoring formula matches `memory.md` verbatim
 - SCENARIO-LIBRARY has ≥6 named scenarios with context + expected behaviour
 - VALIDATION-HARNESS assertion schema fully documented

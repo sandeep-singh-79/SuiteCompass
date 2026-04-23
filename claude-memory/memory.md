@@ -9,8 +9,9 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: V1-A and V1-B remain complete and stable. V1-C implementation is feature-rich. Pre-seal review was conducted and all 6 blocking findings (R1-R5, R6) were resolved in a remediation session. R1: provider exceptions now fall back to deterministic output (exit 0). R2: --summary-only mode implemented. R3: prompt builder now includes override reasons and history provenance. R4: benchmark runner has min_section_word_count assertion type and FakeLLMClient has narrative content. R5: vacuous assertion fixed. R6: plan/docs updated to remove exit-3 and llm_assisted references. Full regression passed: 562 tests, 96.47% coverage. Next: merge/tag or final acceptance review.
-- Active branch: `v1b-diff-mapper`.
+- Current stage: V1-A and V1-B remain complete and stable. V1-C implementation is feature-rich. Pre-seal review remediation was previously completed, and a follow-on increment added flaky-critical elevation for unique, impacted, medium/high-risk coverage. Full regression now passes at 604 tests, 0 failures.
+- Active branch: `feature/flaky-critical-elevation`.
+- Next: strategic review of the 5 feature commits, then decide whether to retain the current 5-commit shape or squash further before PR.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
@@ -96,7 +97,7 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 ## Product Definition
 - **Problem:** Sprint delivery teams carry oversized regression suites that burn CI time and delay releases. Manual triage is ad-hoc and inconsistent. This tool analyses synthetic sprint + test-suite metadata to recommend which tests to run, defer, or retire for a given sprint, and to surface suite health signals.
 - **Inputs:** YAML document with sprint context (stories, risk, changed areas, dependency stories), test suite (id, layer, coverage areas, execution time, flakiness, failure count), exploratory session notes, and constraints (budget, mandatory tags, flakiness thresholds).
-- **Outputs:** Structured markdown report with 6 sections and 7 labelled summary values.
+- **Outputs:** Structured markdown report with 7 sections and 8 labelled summary values.
 - **Non-goals (Phase 1):** JUnit XML ingestion, SCM integration, JIRA integration, LLM narrative, multi-hop deps, fuzzy area matching.
 
 ## Decisions Made (MVP — locked 2026-04-17)
@@ -130,27 +131,36 @@ explanatory_match:   1 if any coverage_area ∈ session risk_areas, else 0
 Tier thresholds: must-run ≥ 8, should-run ≥ 4, defer < 4.
 
 ## Output Contract (locked)
-Required headings (6, line-anchored):
+Required headings (7, line-anchored):
 - `## Optimisation Summary`
 - `## Must-Run`
+- `## Flaky Critical Coverage`
 - `## Should-Run If Time Permits`
 - `## Defer To Overnight Run`
 - `## Retire Candidates`
 - `## Suite Health Summary`
 
-Required labels (7, section-aware):
+Required labels (8, section-aware):
 - `Recommendation Mode:` → Optimisation Summary
 - `Sprint Risk Level:` → Optimisation Summary
 - `Total Must-Run:` → Optimisation Summary
+- `Total Flaky Critical:` → Optimisation Summary
 - `Total Retire Candidates:` → Optimisation Summary
 - `NFR Elevation:` → Optimisation Summary
 - `Budget Overflow:` → Optimisation Summary
 - `Flakiness Tier High:` → Suite Health Summary
 
+## Flaky-Critical Increment (locked 2026-04-23)
+- Flaky-critical is a cross-cutting classification, not a scored tier.
+- Qualification requires all of: flakiness above high threshold, direct overlap with sprint changed areas, matched story risk medium/high, and unique coverage.
+- Flaky-critical tests are always executed, budget-exempt, and rendered in their own section.
+- A single flaky-critical failure is not a clean release-gate signal; the report instructs operators to stabilize or replace the test.
+- Optional input: `constraints.flaky_critical_rerun_max` with default `2`, valid range `1..5`.
+
 ## Active Next Work
-- All R1–R5 remediation tracks complete (committed 91495ab on v1b-diff-mapper).
-- Decision pending: merge v1b-diff-mapper to master, then start V1-C on a new branch.
-- V1-C scope (from plan.md Phase 5 backlog): multi-sprint trend scoring, confidence bands, tiered explanations — review plan.md before starting.
+- Flaky-critical elevation is fully shipped on `feature/flaky-critical-elevation` in 8 commits (original 5 feature commits + F5 prompt context + F3.3 CLI e2e + F4 docs).
+- All drift items identified during post-feature review have been remediated: prompt rerun-max propagation (R1), doc config reconciliation (R2), stale source comments and authority-file updates (R3).
+- Next action: PR preparation — squash decision, then open PR from `feature/flaky-critical-elevation` to `master`.
 
 ## Blockers
 - None.

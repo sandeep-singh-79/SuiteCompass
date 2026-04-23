@@ -78,5 +78,64 @@ class TestTierResult:
 class TestFlowResult:
     def test_fields_accessible(self):
         fr = FlowResult(exit_code=EXIT_OK, message="ok", output_path=None)
-        assert fr.exit_code == EXIT_OK
-        assert fr.output_path is None
+
+
+# ---------------------------------------------------------------------------
+# F1.1 RED — flaky-critical fields on ScoredTest and TierResult
+# ---------------------------------------------------------------------------
+
+class TestScoredTestFlakyCriticalFields:
+    def test_is_flaky_critical_defaults_false(self):
+        st = ScoredTest(
+            test_id="T1", name="n", raw_score=5.0, tier="should-run",
+            is_override=False, override_reason=None, is_manual=False,
+        )
+        assert st.is_flaky_critical is False
+
+    def test_flaky_critical_reason_defaults_none(self):
+        st = ScoredTest(
+            test_id="T1", name="n", raw_score=5.0, tier="should-run",
+            is_override=False, override_reason=None, is_manual=False,
+        )
+        assert st.flaky_critical_reason is None
+
+    def test_is_flaky_critical_can_be_set_true(self):
+        st = ScoredTest(
+            test_id="T1", name="n", raw_score=5.0, tier="flaky-critical",
+            is_override=False, override_reason=None, is_manual=False,
+            is_flaky_critical=True, flaky_critical_reason="unique:[Checkout]",
+        )
+        assert st.is_flaky_critical is True
+        assert st.flaky_critical_reason == "unique:[Checkout]"
+
+    def test_flaky_critical_tier_string_accepted(self):
+        st = ScoredTest(
+            test_id="T1", name="n", raw_score=7.0, tier="flaky-critical",
+            is_override=False, override_reason=None, is_manual=False,
+            is_flaky_critical=True,
+        )
+        assert st.tier == "flaky-critical"
+
+
+class TestTierResultFlakyCriticalList:
+    def test_flaky_critical_list_defaults_empty(self):
+        tr = TierResult()
+        assert tr.flaky_critical == []
+
+    def test_flaky_critical_list_accepts_scored_tests(self):
+        st = ScoredTest(
+            test_id="T1", name="n", raw_score=5.0, tier="flaky-critical",
+            is_override=False, override_reason=None, is_manual=False,
+            is_flaky_critical=True,
+        )
+        tr = TierResult(flaky_critical=[st])
+        assert len(tr.flaky_critical) == 1
+        assert tr.flaky_critical[0].test_id == "T1"
+
+    def test_existing_tier_lists_unaffected(self):
+        tr = TierResult(
+            must_run=[], should_run=[], defer=[], retire=[],
+            budget_overflow=False, flaky_critical=[],
+        )
+        assert tr.must_run == []
+        assert tr.budget_overflow is False

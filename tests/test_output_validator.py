@@ -12,6 +12,7 @@ VALID_OUTPUT = """\
 Recommendation Mode: deterministic
 Sprint Risk Level: high
 Total Must-Run: 3
+Total Flaky Critical: 1
 Total Retire Candidates: 1
 NFR Elevation: yes
 Budget Overflow: no
@@ -21,6 +22,10 @@ Budget Overflow: no
 - TEST-001 payment flow e2e (score: 10.0)
 - TEST-002 retry handler integration (score: 9.4) [override: mandatory]
 - TEST-003 payment service security (score: 8.0) [override: nfr-elevation]
+
+## Flaky Critical Coverage
+
+- TEST-007 flaky auth test (flakiness: 0.35, unique: [auth], action: stabilize or replace)
 
 ## Should-Run If Time Permits
 
@@ -150,3 +155,39 @@ class TestTotalChecksReported:
     def test_total_checks_nonzero(self):
         result = validate_output(VALID_OUTPUT)
         assert result.total_checks > 0
+
+
+# ---------------------------------------------------------------------------
+# F2.1 — Flaky Critical Coverage heading + Total Flaky Critical label
+# ---------------------------------------------------------------------------
+
+class TestFlakyCriticalOutputContract:
+    def test_missing_flaky_critical_heading_fails(self):
+        broken = "\n".join(
+            line for line in VALID_OUTPUT.splitlines()
+            if line.rstrip() != "## Flaky Critical Coverage"
+        )
+        result = validate_output(broken)
+        assert not result.is_valid
+        assert any("## Flaky Critical Coverage" in e for e in result.errors)
+
+    def test_missing_total_flaky_critical_label_fails(self):
+        broken = "\n".join(
+            line for line in VALID_OUTPUT.splitlines()
+            if not line.startswith("Total Flaky Critical:")
+        )
+        result = validate_output(broken)
+        assert not result.is_valid
+        assert any("Total Flaky Critical:" in e for e in result.errors)
+
+    def test_total_flaky_critical_in_wrong_section_fails(self):
+        # Move Total Flaky Critical label to Suite Health Summary
+        broken = VALID_OUTPUT.replace(
+            "Total Flaky Critical: 1\n",
+            "",
+        ).replace(
+            "Flakiness Tier High:",
+            "Total Flaky Critical: 1\nFlakiness Tier High:",
+        )
+        result = validate_output(broken)
+        assert not result.is_valid

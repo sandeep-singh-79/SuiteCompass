@@ -1,0 +1,58 @@
+# Benchmark: flaky-critical-sprint
+# Sprint with a high-risk story changing AuthService.
+# FC-001 is highly flaky (0.45) but has unique coverage over auth — qualifies as flaky-critical.
+# FC-002 is highly flaky but shares coverage with FC-001 so is NOT unique — retires instead.
+# T-003 is a stable must-run test for AuthService.
+# Expected: FC-001 in ## Flaky Critical Coverage, FC-002 in ## Retire Candidates,
+#           T-003 in ## Must-Run, Total Flaky Critical: 1.
+
+sprint_context:
+  sprint_id: SPRINT-FC-01
+  stories:
+    - id: STORY-200
+      title: Harden session token validation
+      risk: high
+      type: feature
+      changed_areas:
+        - AuthService
+        - TokenValidator
+      dependency_stories: []
+  exploratory_sessions: []
+
+test_suite:
+  - id: FC-001
+    name: session token e2e flaky
+    layer: e2e
+    coverage_areas: [AuthService, SessionStore]
+    execution_time_secs: 180
+    flakiness_rate: 0.45
+    failure_count_last_30d: 8
+    automated: true
+    tags: []
+
+  - id: FC-002
+    name: auth retry smoke flaky
+    layer: integration
+    coverage_areas: [AuthService]
+    execution_time_secs: 60
+    flakiness_rate: 0.38
+    failure_count_last_30d: 6
+    automated: true
+    tags: []
+
+  - id: T-003
+    name: token validator unit
+    layer: unit
+    coverage_areas: [TokenValidator]
+    execution_time_secs: 10
+    flakiness_rate: 0.01
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+constraints:
+  time_budget_mins: 60
+  mandatory_tags: []
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20
+  flaky_critical_rerun_max: 2

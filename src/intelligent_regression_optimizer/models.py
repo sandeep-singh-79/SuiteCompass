@@ -33,11 +33,13 @@ class ScoredTest:
     test_id: str
     name: str
     raw_score: float
-    tier: str                     # "must-run" | "should-run" | "defer" | "retire"
+    tier: str                     # "must-run" | "should-run" | "defer" | "retire" | "flaky-critical"
     is_override: bool
     override_reason: str | None
     is_manual: bool
     flakiness_rate: float = 0.0
+    is_flaky_critical: bool = False
+    flaky_critical_reason: str | None = None
 
 
 @dataclass
@@ -49,6 +51,7 @@ class TierResult:
     defer: list[ScoredTest] = field(default_factory=list)
     retire: list[ScoredTest] = field(default_factory=list)
     budget_overflow: bool = False
+    flaky_critical: list[ScoredTest] = field(default_factory=list)
 
 
 @dataclass
