@@ -88,9 +88,9 @@ Three items from the flaky-critical feature plan were not shipped and have been 
 | Field | Value |
 |---|---|
 | Capability | intelligent-regression-optimizer |
-| Objective | MVP SEALED |
-| Current Phase | All phases (V1-A + V1-B + V1-C) complete |
-| Current Focus | Flaky-critical elevation complete. All review findings remediated. 604+ tests passing. Branch ready for PR preparation. |
+| Objective | v1.1.0 SEALED |
+| Current Phase | All phases complete (V1-A + V1-B + V1-C + flaky-critical elevation) |
+| Current Focus | v1.1.0 tagged and released. PR #5 merged. 605 tests, 22 benchmarks, 0 failures. No active work. |
 | Last Updated | 2026-04-23 |
 
 ---
@@ -212,8 +212,10 @@ Planned scope included deterministic fallback text and LLM prompt/context suppor
 1. Flaky tests with unique impacted coverage under medium/high-risk stories are surfaced as flaky-critical.
 2. Non-unique flaky tests still retire.
 3. The report contains a dedicated flaky-critical section and summary count.
-4. Full regression passed at 604 tests.
-5. Next action: strategic review of the 5 commits, then decide whether to keep 5 commits as-is or squash further before PR.
+4. Override (mandatory tag) takes precedence over flaky-critical classification.
+5. Full regression passed at 605 tests, 22 benchmarks.
+6. PR #5 merged (squashed), branch deleted, tagged `v1.1.0`.
+7. No open findings or deferred items.
 
 ---
 

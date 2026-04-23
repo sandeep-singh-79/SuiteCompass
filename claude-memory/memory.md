@@ -9,9 +9,10 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: V1-A and V1-B remain complete and stable. V1-C implementation is feature-rich. Pre-seal review remediation was previously completed, and a follow-on increment added flaky-critical elevation for unique, impacted, medium/high-risk coverage. Full regression now passes at 604 tests, 0 failures.
-- Active branch: `feature/flaky-critical-elevation`.
-- Next: strategic review of the 5 feature commits, then decide whether to retain the current 5-commit shape or squash further before PR.
+- Current stage: v1.1.0 tagged and released. V1-A, V1-B, V1-C complete. Flaky-critical elevation shipped (PR #5 merged, squashed). 605 tests passing, 22 benchmarks passing.
+- Active branch: `master` (clean — no feature branches).
+- Last tag: `v1.1.0` on `c10a878`.
+- Next: decide next capability increment or new capability.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
