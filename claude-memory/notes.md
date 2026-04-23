@@ -10,6 +10,14 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ## Open Questions
 - None.
 
+## Sealed — v1.2.0 (2026-04-23)
+- Situational warnings system shipped: 7 warning IDs (COVERAGE-GAP, OVERRIDE-BUDGET, UNIQUE-DEMOTED, NO-MUST-RUN-COVERAGE, ZERO-BUDGET, NFR-NO-OVERLAP, FLAKINESS-REVERSED).
+- `TierResult.warnings: list[str]` added; `## Warnings` is now required heading (8 total).
+- Context classifier: empty suite now returns `"unknown"` not `"stable"`.
+- end_to_end_flow: history warnings + tier warnings both surface in FlowResult.
+- Dead code removed (overflow_demoted, must_run_ids), docs aligned.
+- 625 tests, 0 failures. Pushed and tagged v1.2.0. master synced with origin.
+
 ## Sealed — v1.1.0 (2026-04-23)
 - All review findings from rounds 1–3 resolved and shipped.
 - PR #5 merged (squashed single commit `c10a878`), branch deleted, tag `v1.1.0` pushed.

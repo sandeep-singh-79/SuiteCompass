@@ -6,7 +6,21 @@
 
 ---
 
-## Active Increment — Flaky-Critical Drift Remediation
+## Current State — v1.2.0 Sealed (2026-04-23)
+
+All increments through v1.2 are shipped, tested, documented, tagged, and pushed.
+
+| Tag | Increment | Tests | Notes |
+|---|---|---|---|
+| v1.0.0 | Full deterministic pipeline + LLM narrative layer | 562 | V1-A, V1-B, V1-C |
+| v1.1.0 | Flaky-critical test elevation | 605 | PR #5 merged, squashed |
+| v1.2.0 | Situational warnings system (7 warning IDs) | 625 | master HEAD |
+
+**Next action:** Decide next capability increment or new capability. No pending work in this repo.
+
+---
+
+## Sealed — Flaky-Critical Drift Remediation (shipped as v1.1.0)
 
 Three items from the flaky-critical feature plan were not shipped and have been addressed. All work stayed on `feature/flaky-critical-elevation`. Execution order: F5 → F3.3 → F4 → post-review remediation (R1, R2, R3).
 
