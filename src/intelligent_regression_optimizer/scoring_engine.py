@@ -122,7 +122,6 @@ def score_tests(normalized: dict[str, Any], classifications: dict[str, Any]) -> 
             defer.append(st)
 
     # --- 5. Budget constraint (scored must-run only; overrides exempt) ------
-    overflow_demoted: list[ScoredTest] = []
     budget_overflow = False
 
     scored_must_run = [s for s in must_run if not s.is_override]
@@ -366,7 +365,6 @@ def _compute_warnings(
     """Detect and return situational warning strings for a sprint run."""
     warnings: list[str] = []
     retire_ids: set[str] = {s.test_id for s in retire}
-    must_run_ids: set[str] = {s.test_id for s in must_run}
     test_map: dict[str, dict] = {t["id"]: t for t in tests}
 
     # W5: ZERO-BUDGET — budget is 0
