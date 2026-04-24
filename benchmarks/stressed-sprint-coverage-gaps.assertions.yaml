@@ -1,0 +1,61 @@
+# Assertions for: stressed-sprint-coverage-gaps
+#
+# A sprint under pressure that fires 5 of 7 situational warning types:
+#   COVERAGE-GAP, OVERRIDE-BUDGET, NO-MUST-RUN-COVERAGE, NFR-NO-OVERLAP,
+#   FLAKINESS-REVERSED
+#
+# All checks are binary pass/fail against the rendered markdown report.
+
+must_include_headings:
+  - "## Optimisation Summary"
+  - "## Must-Run"
+  - "## Flaky Critical Coverage"
+  - "## Should-Run If Time Permits"
+  - "## Defer To Overnight Run"
+  - "## Retire Candidates"
+  - "## Suite Health Summary"
+  - "## Warnings"
+
+must_include_labels:
+  - "Recommendation Mode:"
+  - "Sprint Risk Level:"
+  - "Total Must-Run:"
+  - "Total Retire Candidates:"
+  - "NFR Elevation:"
+  - "Budget Overflow:"
+  - "Flakiness Tier High:"
+  - "Total Flaky Critical:"
+
+must_include_substrings:
+  # --- Tiering expectations ---
+  # NFR-elevated performance test is must-run override
+  - "TEST-303"
+  # Mandatory-tagged smoke suite is must-run override
+  - "TEST-304"
+  # LegacyAuth tests retired (high flakiness, non-unique)
+  - "TEST-305"
+  - "TEST-306"
+  # PaymentCore tests not must-run (flakiness-demoted to should-run)
+  - "TEST-301"
+  - "TEST-302"
+
+  # --- Warning assertions: all 5 warning IDs must appear ---
+  - "[COVERAGE-GAP]"
+  - "[OVERRIDE-BUDGET]"
+  - "[NO-MUST-RUN-COVERAGE]"
+  - "[NFR-NO-OVERLAP]"
+  - "[FLAKINESS-REVERSED]"
+
+  # --- Warning content spot-checks ---
+  # LegacyAuth coverage gap references the story
+  - "LegacyAuth"
+  # No must-run for PaymentCore references the story
+  - "PaymentCore"
+  # NFR elevation was active
+  - "NFR Elevation: Yes"
+  # Budget overflow from overrides
+  - "exceeds the 5-min budget"
+
+must_not_include_substrings:
+  # No warnings should be suppressed
+  - "_No warnings._"

@@ -237,7 +237,7 @@ must_not_include_substrings:
 
 ### What these assertions prove
 
-- The `## Flaky Critical Coverage` heading exists (7-heading contract)
+- The `## Flaky Critical Coverage` heading exists (8-heading contract)
 - The `Total Flaky Critical:` label exists (8-label contract)
 - The qualifying test appears in the flaky-critical section
 - The `stabilize or replace` directive is emitted

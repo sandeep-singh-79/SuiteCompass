@@ -93,6 +93,24 @@ Reload context from files when:
 - Section-aware validation is mandatory: each required label must appear exactly once, in its declared section.
 - Heading validation must be line-anchored: `line.rstrip() == heading`. Headings embedded in prose or indented text must not satisfy the check.
 
+### Output Contract Consumer Registry
+
+When `output_validator.REQUIRED_HEADINGS` or `REQUIRED_LABELS` change, **all** of the following must be updated in the same commit:
+
+| Consumer | File | What to update |
+|---|---|---|
+| Source of truth | `src/.../output_validator.py` | `REQUIRED_HEADINGS`, `LABEL_SECTION_MAP` |
+| Renderer | `src/.../renderer.py` | Emit the new heading/label |
+| Repair module | `src/.../repair.py` | Imports from output_validator (auto) |
+| LLM system prompt | `src/.../prompts/v1/system.txt` | Heading list, label list, section count |
+| Prompt guard tests | `tests/test_template_loader.py` | Guard tests import from output_validator (auto if written correctly) |
+| Validator tests | `tests/test_output_validator.py` | VALID_OUTPUT fixture, individual heading/label tests |
+| Benchmark assertions | `benchmarks/*.assertions.yaml` | `must_include_headings` lists |
+| V1-OUTPUT-TEMPLATE | `docs/V1-OUTPUT-TEMPLATE.md` | Heading/label counts, annotated sample |
+| VALIDATION-HARNESS | `docs/VALIDATION-HARNESS.md` | Best-practices heading count, example snippet |
+| USAGE-GUIDE | `docs/USAGE-GUIDE.md` | Section count in Step 3 |
+| README | `README.md` | Development Status table (if contract size is cited) |
+
 ## LLM Integration Rules
 
 - Every prompt must include: the full output contract (headings + labels), a no-invention instruction, an assumption-surfacing instruction, and a do-not-contradict instruction.

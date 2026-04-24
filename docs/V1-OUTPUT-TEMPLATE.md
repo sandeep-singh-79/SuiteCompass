@@ -20,10 +20,10 @@ Annotated reference for the SuiteCompass optimisation report. The output is a st
 |---|---|---|
 | 1 | `## Optimisation Summary` | Sprint-level overview with key decision labels |
 | 2 | `## Must-Run` | Tests that must execute this sprint (overrides + high-scorers) |
-| 3 | `## Should-Run If Time Permits` | Tests to run if budget allows |
-| 4 | `## Defer To Overnight Run` | Tests safe to defer to off-hours CI |
-| 5 | `## Retire Candidates` | Tests recommended for removal from the suite |
-| 6 | `## Flaky Critical Coverage` | Flaky tests with unique coverage that must still run |
+| 3 | `## Flaky Critical Coverage` | Flaky tests with unique coverage that must still run |
+| 4 | `## Should-Run If Time Permits` | Tests to run if budget allows |
+| 5 | `## Defer To Overnight Run` | Tests safe to defer to off-hours CI |
+| 6 | `## Retire Candidates` | Tests recommended for removal from the suite |
 | 7 | `## Suite Health Summary` | Aggregate health metrics for the test suite |
 | 8 | `## Warnings` | Situational warnings about silent scoring decisions |
 
@@ -65,6 +65,13 @@ Total Flaky Critical: 1
 - TEST-003 payment service security (score: 14.4) [override: nfr-elevation]
 - TEST-001 payment flow e2e (score: 14.1)
 
+## Flaky Critical Coverage
+
+> These tests are flaky but cover sprint story areas that no other test reaches.
+> They must execute despite their flakiness. Rerun up to 2 times before treating a failure as confirmed.
+
+- AUTH-005 session token e2e (flakiness: 0.45) [stabilize or replace] unique:[SessionStore]
+
 ## Should-Run If Time Permits
 
 _No tests in this tier._
@@ -76,13 +83,6 @@ _No tests in this tier._
 ## Retire Candidates
 
 _No retire candidates._
-
-## Flaky Critical Coverage
-
-> These tests are flaky but cover sprint story areas that no other test reaches.
-> They must execute despite their flakiness. Rerun up to 2 times before treating a failure as confirmed.
-
-- AUTH-005 session token e2e (flakiness: 0.45) [stabilize or replace] unique:[SessionStore]
 
 ## Suite Health Summary
 
@@ -101,7 +101,7 @@ _No warnings._
 
 ### Optimisation Summary
 
-The sprint-level control panel. Contains all 6 labels that drive team decisions:
+The sprint-level control panel. Contains all 8 labels that drive team decisions:
 
 - **Recommendation Mode** — always `deterministic` until LLM layer is added
 - **Sprint Risk Level** — derived from the highest `risk` value across all stories

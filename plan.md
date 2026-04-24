@@ -2,21 +2,25 @@
 
 > **Purpose:** Track the active planning and execution steps for the `intelligent-regression-optimizer` repository.
 > **Scope:** Session-specific or cycle-specific. Refresh as milestones update.
-> **Last Updated:** 2026-04-23
+> **Last Updated:** 2026-04-24
 
 ---
 
-## Current State — v1.2.0 Sealed (2026-04-23)
+## Current State — v1.3.0 Sealed (2026-04-24)
 
-All increments through v1.2 are shipped, tested, documented, tagged, and pushed.
+All increments through v1.3 are shipped, tested, documented, and tagged locally.
+Three implementation review rounds plus one governance-only review round are complete.
+
+**Next action:** Push `master` and tag `v1.3.0` to origin, then decide the next capability increment.
 
 | Tag | Increment | Tests | Notes |
 |---|---|---|---|
 | v1.0.0 | Full deterministic pipeline + LLM narrative layer | 562 | V1-A, V1-B, V1-C |
 | v1.1.0 | Flaky-critical test elevation | 605 | PR #5 merged, squashed |
 | v1.2.0 | Situational warnings system (7 warning IDs) | 625 | master HEAD |
+| v1.3.0 | MVP gap fixes: init command, warning benchmark, metadata | 664 | 4 review rounds complete; tagged locally on current HEAD |
 
-**Next action:** Decide next capability increment or new capability. No pending work in this repo.
+**Next action:** Push `master` and tag `v1.3.0` to origin, then decide the next capability increment.
 
 ---
 

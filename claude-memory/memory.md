@@ -9,10 +9,10 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 
 ## Capability Context
 - Repository purpose: build an AI-native regression optimizer that analyses test suite history to identify redundant, flaky, and high-risk tests, then recommends prioritisation and pruning decisions to improve release confidence without increasing cycle time.
-- Current stage: v1.2.0 tagged and released. V1-A, V1-B, V1-C complete. Flaky-critical elevation (v1.1) and situational warnings system (v1.2) shipped. 625 tests passing.
-- Active branch: `master` (clean — synced with origin).
-- Last tag: `v1.2.0` on `df9269d` + follow-up commits: dead code removal (`0699aa5`), doc alignment (`246a305`).
-- Next: decide next capability increment.
+- Current stage: v1.3.0 is sealed locally on `master` and validated at 664 passing tests. Review round 4 governance drift has been resolved.
+- Active branch: `master` (clean — NOT YET pushed to origin).
+- Last tag: `v1.3.0` is present locally on the sealed `master` commit.
+- Next: push `master` and tag `v1.3.0` to origin, then decide the next capability increment.
 
 ## v1.0 Engineering Principles (MANDATORY — enforce per sub-phase, survive compaction)
 
@@ -98,7 +98,7 @@ Current state, decisions, and active priorities for the `intelligent-regression-
 ## Product Definition
 - **Problem:** Sprint delivery teams carry oversized regression suites that burn CI time and delay releases. Manual triage is ad-hoc and inconsistent. This tool analyses synthetic sprint + test-suite metadata to recommend which tests to run, defer, or retire for a given sprint, and to surface suite health signals.
 - **Inputs:** YAML document with sprint context (stories, risk, changed areas, dependency stories), test suite (id, layer, coverage areas, execution time, flakiness, failure count), exploratory session notes, and constraints (budget, mandatory tags, flakiness thresholds).
-- **Outputs:** Structured markdown report with 7 sections and 8 labelled summary values.
+- **Outputs:** Structured markdown report with 8 sections and 8 labelled summary values.
 - **Non-goals (Phase 1):** JUnit XML ingestion, SCM integration, JIRA integration, LLM narrative, multi-hop deps, fuzzy area matching.
 
 ## Decisions Made (MVP — locked 2026-04-17)
@@ -132,7 +132,7 @@ explanatory_match:   1 if any coverage_area ∈ session risk_areas, else 0
 Tier thresholds: must-run ≥ 8, should-run ≥ 4, defer < 4.
 
 ## Output Contract (locked)
-Required headings (7, line-anchored):
+Required headings (8, line-anchored):
 - `## Optimisation Summary`
 - `## Must-Run`
 - `## Flaky Critical Coverage`
@@ -140,6 +140,7 @@ Required headings (7, line-anchored):
 - `## Defer To Overnight Run`
 - `## Retire Candidates`
 - `## Suite Health Summary`
+- `## Warnings`
 
 Required labels (8, section-aware):
 - `Recommendation Mode:` → Optimisation Summary
@@ -159,9 +160,9 @@ Required labels (8, section-aware):
 - Optional input: `constraints.flaky_critical_rerun_max` with default `2`, valid range `1..5`.
 
 ## Active Next Work
-- Flaky-critical elevation is fully shipped on `feature/flaky-critical-elevation` in 8 commits (original 5 feature commits + F5 prompt context + F3.3 CLI e2e + F4 docs).
-- All drift items identified during post-feature review have been remediated: prompt rerun-max propagation (R1), doc config reconciliation (R2), stale source comments and authority-file updates (R3).
-- Next action: PR preparation — squash decision, then open PR from `feature/flaky-critical-elevation` to `master`.
+- v1.3.0 is sealed locally on `master` with the tag `v1.3.0` on the current HEAD commit.
+- Three implementation review rounds plus one governance-only review round have been completed.
+- Next action: push `master` and tag `v1.3.0` to origin, then choose the next capability increment.
 
 ## Blockers
 - None.

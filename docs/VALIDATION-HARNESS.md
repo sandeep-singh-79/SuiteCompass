@@ -141,6 +141,8 @@ pytest tests/test_benchmark_runner.py
 | High-Risk Feature Sprint | `high-risk-feature-sprint.input.yaml` | `high-risk-feature-sprint.assertions.yaml` | NFR elevation active, perf/security in must-run, budget overflow, manual test handling |
 | Low-Risk Bugfix Sprint | `low-risk-bugfix-sprint.input.yaml` | `low-risk-bugfix-sprint.assertions.yaml` | Low sprint risk, minimal must-run, no retire candidates, no NFR elevation |
 | Degraded Suite / High Flakiness | `degraded-suite-high-flakiness.input.yaml` | `degraded-suite-high-flakiness.assertions.yaml` | Retire candidates identified, flakiness tier high count, suite health degraded |
+| Flaky-Critical Sprint | `flaky-critical-sprint.input.yaml` | `flaky-critical-sprint.assertions.yaml` | Flaky-critical elevation, unique coverage protection, retire vs FC split |
+| Stressed Sprint / Coverage Gaps | `stressed-sprint-coverage-gaps.input.yaml` | `stressed-sprint-coverage-gaps.assertions.yaml` | 5 warning types fired: COVERAGE-GAP, OVERRIDE-BUDGET, NO-MUST-RUN-COVERAGE, NFR-NO-OVERLAP, FLAKINESS-REVERSED |
 
 Additionally, `benchmarks/sample-import.xlsx` is used for Excel import round-trip testing.
 
@@ -180,10 +182,12 @@ Create `benchmarks/<scenario-name>.assertions.yaml`:
 must_include_headings:
   - "## Optimisation Summary"
   - "## Must-Run"
+  - "## Flaky Critical Coverage"
   - "## Should-Run If Time Permits"
   - "## Defer To Overnight Run"
   - "## Retire Candidates"
   - "## Suite Health Summary"
+  - "## Warnings"
 
 must_include_labels:
   - "Recommendation Mode:"
@@ -217,7 +221,7 @@ Add both files to version control. The CI pipeline will run all benchmarks on ev
 
 ## Best Practices for Assertions
 
-1. **Always include all 7 headings** — catches rendering regressions
+1. **Always include all 8 headings** — catches rendering regressions
 2. **Assert specific test IDs** in expected tiers — catches scoring regressions
 3. **Assert label values** (e.g. `Sprint Risk Level: high`) not just label presence
 4. **Use `must_not_include_substrings`** for negative assertions — e.g. manual tests should never appear in retire format

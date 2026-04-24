@@ -5,6 +5,7 @@ import pytest
 from pathlib import Path
 
 from intelligent_regression_optimizer.template_loader import load_template
+from intelligent_regression_optimizer.output_validator import REQUIRED_HEADINGS, REQUIRED_LABELS
 
 
 # ---------------------------------------------------------------------------
@@ -59,10 +60,12 @@ def test_system_template_contains_required_headings():
     for heading in [
         "## Optimisation Summary",
         "## Must-Run",
+        "## Flaky Critical Coverage",
         "## Should-Run If Time Permits",
         "## Defer To Overnight Run",
         "## Retire Candidates",
         "## Suite Health Summary",
+        "## Warnings",
     ]:
         assert heading in content, f"system.txt missing heading: {heading!r}"
 
@@ -73,12 +76,49 @@ def test_system_template_contains_required_labels():
         "Recommendation Mode:",
         "Sprint Risk Level:",
         "Total Must-Run:",
+        "Total Flaky Critical:",
         "Total Retire Candidates:",
         "NFR Elevation:",
         "Budget Overflow:",
         "Flakiness Tier High:",
     ]:
         assert label in content, f"system.txt missing label: {label!r}"
+
+
+# ---------------------------------------------------------------------------
+# Contract-alignment guard tests — import canonical lists from output_validator
+# so any future contract expansion that forgets to update system.txt will fail.
+# ---------------------------------------------------------------------------
+
+def test_system_prompt_contains_all_required_headings():
+    """Every heading in output_validator.REQUIRED_HEADINGS must appear in system.txt."""
+    content = load_template("system")
+    for heading in REQUIRED_HEADINGS:
+        assert heading in content, (
+            f"system.txt is missing heading {heading!r} from output_validator.REQUIRED_HEADINGS"
+        )
+
+
+def test_system_prompt_contains_all_required_labels():
+    """Every label in output_validator.REQUIRED_LABELS must appear in system.txt."""
+    content = load_template("system")
+    for label in REQUIRED_LABELS:
+        assert label in content, (
+            f"system.txt is missing label {label!r} from output_validator.REQUIRED_LABELS"
+        )
+
+
+def test_system_prompt_section_count_matches_contract():
+    """The section count stated in system.txt must match len(REQUIRED_HEADINGS)."""
+    content = load_template("system")
+    expected = len(REQUIRED_HEADINGS)
+    import re
+    match = re.search(r"exactly these (\d+) sections", content)
+    assert match is not None, "system.txt does not state a section count"
+    stated = int(match.group(1))
+    assert stated == expected, (
+        f"system.txt says {stated} sections but output_validator.REQUIRED_HEADINGS has {expected}"
+    )
 
 
 def test_scenario_templates_contain_placeholders():

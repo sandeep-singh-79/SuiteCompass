@@ -1,0 +1,116 @@
+# Benchmark: stressed-sprint-coverage-gaps
+#
+# A sprint under pressure: tight budget, a degraded legacy area, an NFR
+# elevation that misses the sprint scope, and flakiness that silently
+# demotes the one test covering a high-risk story.
+#
+# Expected warnings fired (5 of 7):
+#   [NO-MUST-RUN-COVERAGE]  — PaymentCore has no must-run coverage
+#   [FLAKINESS-REVERSED]    — TEST-301 would be must-run without flakiness
+#   [NFR-NO-OVERLAP]        — performance test covers Monitoring, not sprint areas
+#   [COVERAGE-GAP]          — LegacyAuth covered only by retired tests
+#   [OVERRIDE-BUDGET]       — mandatory test alone exceeds 5-min budget
+
+sprint_context:
+  sprint_id: SPRINT-STRESS-01
+  stories:
+    - id: PROJ-2001
+      title: Refactor PaymentCore settlement logic
+      risk: high
+      type: refactor
+      changed_areas: [PaymentCore]
+      dependency_stories: []
+
+    - id: PROJ-2002
+      title: Update LegacyAuth token handler
+      risk: medium
+      type: bugfix
+      changed_areas: [LegacyAuth]
+      dependency_stories: []
+
+test_suite:
+  # TEST-301: covers PaymentCore (high-risk story).
+  # Non-unique (TEST-302 also covers PaymentCore).
+  # Flakiness 0.28 → score = 10×1.0 − 8×0.28 = 7.76 → should-run (not must-run).
+  # Without flakiness: 10.0 ≥ 8 → fires FLAKINESS-REVERSED + NO-MUST-RUN-COVERAGE.
+  - id: TEST-301
+    name: payment core settlement integration
+    layer: integration
+    coverage_areas: [PaymentCore]
+    execution_time_secs: 90
+    flakiness_rate: 0.28
+    failure_count_last_30d: 3
+    automated: true
+    tags: []
+
+  # TEST-302: also covers PaymentCore (so TEST-301 is non-unique → not flaky-critical).
+  # Clean but scores only 7.76 too — no, wait: this test has no flakiness so scores 10.
+  # With flakiness 0.0: score = 10.0 → must-run.
+  # BUT if TEST-302 is must-run and covers PaymentCore, NO-MUST-RUN-COVERAGE won't fire.
+  # Solution: make TEST-302 cover a DIFFERENT area so PaymentCore is still uncovered by must-run.
+  - id: TEST-302
+    name: payment core unit backup
+    layer: unit
+    coverage_areas: [PaymentCore, OrderService]
+    execution_time_secs: 30
+    flakiness_rate: 0.28
+    failure_count_last_30d: 2
+    automated: true
+    tags: []
+
+  # TEST-303: performance test — NFR elevation will force this to must-run.
+  # Covers "Monitoring" only — no overlap with sprint areas (PaymentCore, LegacyAuth).
+  # Fires NFR-NO-OVERLAP.
+  - id: TEST-303
+    name: monitoring dashboard load performance
+    layer: performance
+    coverage_areas: [Monitoring]
+    execution_time_secs: 180
+    flakiness_rate: 0.0
+    failure_count_last_30d: 0
+    automated: true
+    tags: []
+
+  # TEST-304: mandatory-tagged test — always must-run.
+  # Takes 480s (8 min) > 5-min budget → fires OVERRIDE-BUDGET.
+  # Covers OrderService only — does NOT cover PaymentCore, so NO-MUST-RUN-COVERAGE still fires.
+  - id: TEST-304
+    name: full smoke suite end-to-end
+    layer: e2e
+    coverage_areas: [OrderService]
+    execution_time_secs: 480
+    flakiness_rate: 0.02
+    failure_count_last_30d: 0
+    automated: true
+    tags: [smoke]
+
+  # TEST-305 and TEST-306: both cover LegacyAuth, non-unique (both cover it).
+  # Both have flakiness > 0.30 (retire threshold) → both retire.
+  # No other test covers LegacyAuth → fires COVERAGE-GAP for PROJ-2002.
+  - id: TEST-305
+    name: legacy auth token validation A
+    layer: integration
+    coverage_areas: [LegacyAuth]
+    execution_time_secs: 60
+    flakiness_rate: 0.45
+    failure_count_last_30d: 8
+    automated: true
+    tags: []
+
+  - id: TEST-306
+    name: legacy auth token validation B
+    layer: integration
+    coverage_areas: [LegacyAuth]
+    execution_time_secs: 60
+    flakiness_rate: 0.38
+    failure_count_last_30d: 6
+    automated: true
+    tags: []
+
+constraints:
+  # Tight 5-minute budget — the mandatory smoke suite (8 min) exceeds it alone.
+  time_budget_mins: 5
+  mandatory_tags: [smoke]
+  flakiness_retire_threshold: 0.30
+  flakiness_high_tier_threshold: 0.20
+  flaky_critical_rerun_max: 2

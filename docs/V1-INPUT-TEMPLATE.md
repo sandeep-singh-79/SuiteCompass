@@ -79,6 +79,7 @@ These fields are accepted via Excel import and carried through to YAML output, b
 | `mandatory_tags` | list[string] | Yes | Tags that force a test to must-run regardless of score |
 | `flakiness_retire_threshold` | float | Yes | Tests above this flakiness rate (with no unique coverage) are retire candidates |
 | `flakiness_high_tier_threshold` | float | Yes | Threshold for "Flakiness Tier High" count in Suite Health Summary |
+| `flaky_critical_rerun_max` | integer | No | Max reruns for flaky-critical tests before treating failure as confirmed (default 2, range 1–5) |
 
 ---
 

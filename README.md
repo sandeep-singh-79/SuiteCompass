@@ -21,7 +21,7 @@ Sprint delivery teams carry oversized regression suites that burn CI time and de
 | Path | Purpose |
 |---|---|
 | `src/intelligent_regression_optimizer/` | Core package — loader, classifier, scorer, renderer, validator, CLI |
-| `tests/` | 601 pytest tests |
+| `tests/` | 660+ pytest tests |
 | `benchmarks/` | Benchmark input YAMLs + assertion files + sample Excel |
 | `templates/` | Excel import template (13 columns) |
 | `docs/` | Full documentation (see index below) |
@@ -60,6 +60,7 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | `iro diff-areas --area-map <map> --ref <ref>` | Print YAML fragment of changed areas from git diff | `--area-map <path>`, `--diff-file <path>`, `--ref <git-ref>` | 0 = success, 2 = input error |
 | `iro benchmark <input.yaml> <assertions.yaml>` | Run pipeline + validate against assertions | — | 0 = pass, 1 = fail, 2 = input error |
 | `iro import-tests <file.xlsx>` | Import Excel test inventory as test_suite YAML | `--output, -o <path>`, `--sheet, -s <name>` | 0 = success, 2 = input error |
+| `iro init [-o <file>]` | Generate a commented input YAML scaffold | `--output, -o <path>`, `--from-junit <dir>` | 0 = success, 2 = input error |
 
 ## Documentation
 
@@ -87,7 +88,9 @@ iro import-tests templates/test_suite_template.xlsx --output test_suite.yaml
 | V1-B (git diff area mapper) | Complete |
 | V1-C (LLM narrative layer) | Complete |
 | V1-D (Flaky-Critical Elevation) | Complete |
-| Tests | 601 |
+| V1-E (Situational Warnings) | Complete |
+| V1-F (MVP Gap Fixes — init command, warning benchmark) | Complete |
+| Tests | 660+ |
 | Python | ≥ 3.13 |
 
 ## License

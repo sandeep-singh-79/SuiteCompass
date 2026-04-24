@@ -13,7 +13,7 @@ from intelligent_regression_optimizer.models import (
 
 # ---------------------------------------------------------------------------
 # A minimal but fully contract-compliant report used by FakeLLMClient.
-# All 7 headings and all 8 labels present, Recommendation Mode set to "llm".
+# All 8 headings and all 8 labels present, Recommendation Mode set to "llm".
 # ---------------------------------------------------------------------------
 _FAKE_RESPONSE = """\
 ## Optimisation Summary

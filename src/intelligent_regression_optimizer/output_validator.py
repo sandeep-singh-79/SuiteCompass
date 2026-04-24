@@ -69,7 +69,7 @@ def validate_output(markdown: str) -> ValidationResult:
     """Validate a rendered report against the output contract.
 
     Checks performed:
-    1. All 7 required headings present (line-anchored).
+    1. All 8 required headings present (line-anchored).
     2. All 8 required labels present exactly once.
     3. No label appears more than once.
     4. Each label appears in its declared section.

@@ -491,3 +491,126 @@ def diff_areas(area_map: str, diff_file: str | None, ref: str | None) -> None:
     )
     click.echo(fragment, nl=False)
     sys.exit(EXIT_OK)
+
+
+# ---------------------------------------------------------------------------
+# init command — template YAML generator
+# ---------------------------------------------------------------------------
+
+import textwrap as _textwrap
+
+_PLAIN_SCAFFOLD = _textwrap.dedent("""\
+    # TODO: Fill in the sprint context below
+    sprint_context:
+      sprint_goal: "TODO: Describe the sprint goal"
+      stories:
+        - id: TODO_story_id  # TODO: unique story identifier
+          summary: "TODO: Story summary"
+          risk: high  # TODO: one of: high | medium | low
+          changed_areas: []  # TODO: list of changed areas
+
+    # TODO: Define the tests to consider for this sprint
+    test_suite:
+      - id: TODO_test_id
+        name: "TODO: human readable test name"
+        layer: unit  # TODO: one of: unit | integration | e2e | security | performance
+        coverage_areas: [TODO_area]  # TODO: list of areas this test covers
+        execution_time_secs: 0  # TODO: average execution time in seconds
+        flakiness_rate: 0.0     # TODO: fraction of runs that were flaky
+
+    # TODO: Define optimisation constraints
+    constraints:
+      time_budget_mins: 5       # TODO: execution budget in minutes
+      mandatory_tags: []        # TODO: tags that force must-run
+      flakiness_retire_threshold: 0.30   # TODO: retire threshold
+      flakiness_high_tier_threshold: 0.20  # TODO: high-flakiness threshold
+""")
+
+
+@main.command("init")
+@click.option("--output", "-o", type=click.Path(), default=None,
+              help="Write template YAML to this file instead of stdout.")
+@click.option("--from-junit", "from_junit", type=click.Path(), default=None,
+              help="Directory of JUnit XML files to pre-populate the template.")
+def init(output: str | None, from_junit: str | None) -> None:
+    """Generate a template YAML input file for 'iro run'."""
+    import collections as _collections
+    import xml.etree.ElementTree as _ET
+
+    if from_junit is not None:
+        junit_path = Path(from_junit)
+        if not junit_path.is_dir():
+            click.echo(f"Error: --from-junit directory not found: {from_junit!r}", err=True)
+            sys.exit(EXIT_INPUT_ERROR)
+
+        xml_files = sorted(junit_path.glob("*.xml"))
+        times_acc: dict[str, list[float]] = _collections.defaultdict(list)
+        names_map: dict[str, str] = {}
+
+        for xml_file in xml_files:
+            try:
+                tree = _ET.parse(xml_file)
+            except _ET.ParseError as exc:
+                click.echo(f"Error: malformed XML {xml_file.name!r}: {exc}", err=True)
+                sys.exit(EXIT_INPUT_ERROR)
+            root = tree.getroot()
+            if root.tag == "testsuites":
+                suites = list(root.findall("testsuite"))
+            elif root.tag == "testsuite":
+                suites = [root]
+            else:
+                suites = list(root.iter("testsuite"))
+            for suite in suites:
+                for tc in suite.findall("testcase"):
+                    if tc.find("skipped") is not None:
+                        continue
+                    name = tc.get("name") or ""
+                    classname = tc.get("classname") or None
+                    test_id = f"{classname}::{name}" if classname else name
+                    time_str = tc.get("time") or "0"
+                    try:
+                        t = float(time_str)
+                    except ValueError:
+                        t = 0.0
+                    times_acc[test_id].append(t)
+                    if test_id not in names_map:
+                        names_map[test_id] = name
+
+        history = parse_junit_directory(from_junit)
+
+        test_entries = []
+        for test_id in sorted(times_acc):
+            avg_time = sum(times_acc[test_id]) / len(times_acc[test_id])
+            exec_time_int = max(1, round(avg_time))
+            flakiness_rec = history.get(test_id)
+            flakiness_rate = round(flakiness_rec.flakiness_rate, 4) if flakiness_rec else 0.0
+            test_entries.append({
+                "id": test_id,
+                "name": names_map.get(test_id, test_id),
+                "layer": "TODO",
+                "coverage_areas": ["UNKNOWN"],
+                "execution_time_secs": exec_time_int,
+                "flakiness_rate": flakiness_rate,
+            })
+
+        doc = {
+            "sprint_context": {
+                "sprint_goal": "TODO: Describe the sprint goal",
+                "stories": [{"id": "TODO_story_id", "summary": "TODO: Story summary", "risk": "high", "changed_areas": []}],
+            },
+            "test_suite": test_entries,
+            "constraints": {
+                "time_budget_mins": 5,
+                "mandatory_tags": [],
+                "flakiness_retire_threshold": 0.30,
+                "flakiness_high_tier_threshold": 0.20,
+            },
+        }
+        raw = yaml.dump(doc, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        raw = raw.replace("layer: TODO", "layer: TODO  # TODO: one of unit | integration | e2e")
+
+        _emit(output, raw)
+        sys.exit(EXIT_OK)
+
+    _emit(output, _PLAIN_SCAFFOLD)
+    sys.exit(EXIT_OK)

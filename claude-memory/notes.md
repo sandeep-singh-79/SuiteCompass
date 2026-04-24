@@ -10,6 +10,12 @@ In-progress analysis, temporary notes, open questions, and working context for t
 ## Open Questions
 - None.
 
+## Review Round 4 Findings (2026-04-24)
+- Code and tests are still green: `python -m pytest -q` = 664 passed.
+- Resolved during review: the stale v1.3.0 commit reference (`1646204`) was removed from current-state files in favor of stable tag-based wording.
+- Resolved after review: the stale `## Active Next Work` section in `claude-memory/memory.md` was updated to the current post-v1.3 state on `master`.
+- Outcome: review round 4 is fully resolved; no open governance findings remain before push.
+
 ## Sealed — v1.2.0 (2026-04-23)
 - Situational warnings system shipped: 7 warning IDs (COVERAGE-GAP, OVERRIDE-BUDGET, UNIQUE-DEMOTED, NO-MUST-RUN-COVERAGE, ZERO-BUDGET, NFR-NO-OVERLAP, FLAKINESS-REVERSED).
 - `TierResult.warnings: list[str]` added; `## Warnings` is now required heading (8 total).

@@ -27,6 +27,37 @@ iro --help
 
 ---
 
+## Workflow 0: Quick Start from Template
+
+Generate a pre-structured input YAML instead of writing one from scratch.
+
+### Plain scaffold
+
+```bash
+iro init -o my-sprint.yaml
+```
+
+Opens `my-sprint.yaml` with all required sections (`sprint_context`, `test_suite`, `constraints`) and inline `# TODO` comments guiding each field.  Fill in the TODOs, then proceed to Workflow 1.
+
+### Pre-populate from JUnit XML history
+
+If you have a directory of JUnit XML files from previous CI runs, SuiteCompass can extract test IDs, names, average execution times, and flakiness rates automatically:
+
+```bash
+iro init --from-junit path/to/junit-xml-dir/ -o my-sprint.yaml
+```
+
+The generated file will have one test entry per discovered test, with `layer` and `coverage_areas` left as `TODO` placeholders.  Fill those in, add `sprint_context`, and run.
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `--output, -o <path>` | Write template to file (default: print to stdout) |
+| `--from-junit <dir>` | Pre-populate test entries from JUnit XML history directory |
+
+---
+
 ## Workflow 1: YAML-First
 
 Write your input YAML directly and run the optimiser.
@@ -49,7 +80,7 @@ iro run sprint_input.yaml --output report.md
 
 ### Step 3 — Read the report
 
-The report contains 6 sections. See [V1-OUTPUT-TEMPLATE](V1-OUTPUT-TEMPLATE.md) for detailed interpretation.
+The report contains 8 sections. See [V1-OUTPUT-TEMPLATE](V1-OUTPUT-TEMPLATE.md) for detailed interpretation.
 
 ---
 
