@@ -11,12 +11,24 @@ Read these files before proceeding.
 
 ## Session Start Checklist
 
-1. Read `AGENTS.md`
-2. Read `claude-memory/memory.md`
-3. Read `claude-memory/insights.md`
-4. Read `claude-memory/notes.md`
-5. Read `plan.md`
-6. Confirm the active milestone, next action, and any blockers
+### Step 1 — Load program-level memory (workspace root)
+1. Read `../AGENTS.md` (workspace root)
+2. Read `../claude-memory/memory.md`
+3. Read `../claude-memory/insights.md`
+4. Read `../claude-memory/notes.md`
+5. Read `../plan.md`
+
+### Step 2 — Load repo-level memory (this repo)
+6. Read `AGENTS.md` (this file)
+7. Read `claude-memory/memory.md`
+8. Read `claude-memory/insights.md`
+9. Read `claude-memory/notes.md`
+10. Read `plan.md`
+
+### Step 3 — Confirm state
+11. Confirm the active milestone, next action, and any blockers from both layers
+
+> Both layers must be loaded. The program layer carries portfolio strategy, cross-system decisions, and repositioning thesis. The repo layer carries active story, scoring algorithm, output contract, and implementation state.
 
 ## Working Rules
 
@@ -71,8 +83,8 @@ Use binary pass/fail validation for capability work.
   - automated tests exist for normal, negative, and edge-case behavior where applicable
 
 - Context recovery passes only if:
-  - `AGENTS.md`, `claude-memory/`, and `plan.md` were reloaded
-  - active milestone, next step, and blockers were restated before work continues
+  - Both the program-level layer (`../AGENTS.md`, `../claude-memory/`, `../plan.md`) and the repo-level layer (`AGENTS.md`, `claude-memory/`, `plan.md`) were reloaded
+  - Active milestone, next step, and blockers were restated from both layers before work continues
 
 ## Context Recovery Rule
 
